@@ -48,8 +48,8 @@ export default function Home() {
       }
       const data = await res.json();
       setResults(data);
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
@@ -73,8 +73,8 @@ export default function Home() {
         }
         const data = await res.json();
         setAnalysis(data);
-      } catch (err: any) {
-        setAnalysisError(err.message || "An error occurred during analysis");
+      } catch (err: unknown) {
+        setAnalysisError(err instanceof Error ? err.message : "An error occurred during analysis");
       } finally {
         setAnalyzing(false);
       }
