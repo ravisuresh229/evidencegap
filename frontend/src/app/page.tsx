@@ -37,7 +37,7 @@ export default function Home() {
     setAnalysis(null);
     setAnalysisError(null);
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/scrape", {
+      const res = await fetch("/api/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question }),
@@ -62,7 +62,7 @@ export default function Home() {
       setAnalysis(null);
       setAnalysisError(null);
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/analyze", {
+        const res = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question, results }),
