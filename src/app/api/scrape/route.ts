@@ -18,7 +18,57 @@ const MEDICAL_SYNONYMS: { [key: string]: string[] } = {
   'effectiveness': ['effectiveness', 'efficacy', 'outcome', 'benefit', 'impact'],
   'treatment': ['treatment', 'therapy', 'intervention', 'management'],
   'prevention': ['prevention', 'preventive', 'prophylaxis'],
-  'diagnosis': ['diagnosis', 'diagnostic', 'screening', 'detection']
+  'diagnosis': ['diagnosis', 'diagnostic', 'screening', 'detection'],
+  'ra': ['rheumatoid arthritis', 'RA', 'rheumatoid', 'arthritis'],
+  'rheumatoid arthritis': ['rheumatoid arthritis', 'RA', 'rheumatoid', 'arthritis'],
+  'biologics': ['biologics', 'biologic', 'biological', 'biopharmaceutical'],
+  'glp-1': ['glp-1', 'glp1', 'glucagon-like peptide-1', 'glucagon like peptide 1'],
+  'statins': ['statins', 'statin', 'HMG-CoA reductase inhibitors'],
+  'telemedicine': ['telemedicine', 'telehealth', 'remote care', 'virtual care'],
+  'dental': ['dental', 'dentistry', 'tooth', 'teeth', 'oral'],
+  'cardiology': ['cardiology', 'cardiac', 'heart', 'cardiovascular'],
+  'oncology': ['oncology', 'cancer', 'tumor', 'neoplasm', 'malignancy'],
+  'neurology': ['neurology', 'neurological', 'brain', 'nervous system'],
+  'psychiatry': ['psychiatry', 'psychiatric', 'mental health', 'psychology']
+};
+
+// Medical condition categories and their related terms
+const MEDICAL_CONDITIONS: { [key: string]: { terms: string[], category: string, specialty: string } } = {
+  'rheumatoid arthritis': {
+    terms: ['rheumatoid arthritis', 'RA', 'rheumatoid', 'arthritis', 'rheumatology', 'autoimmune', 'joint inflammation'],
+    category: 'rheumatology',
+    specialty: 'rheumatology'
+  },
+  'diabetes': {
+    terms: ['diabetes', 'diabetes mellitus', 'diabetic', 'glucose', 'insulin', 'endocrinology', 'metabolic'],
+    category: 'endocrinology',
+    specialty: 'endocrinology'
+  },
+  'hypertension': {
+    terms: ['hypertension', 'high blood pressure', 'HTN', 'cardiovascular', 'cardiac', 'heart'],
+    category: 'cardiovascular',
+    specialty: 'cardiology'
+  },
+  'cancer': {
+    terms: ['cancer', 'tumor', 'neoplasm', 'malignancy', 'oncology', 'carcinoma', 'sarcoma'],
+    category: 'oncology',
+    specialty: 'oncology'
+  },
+  'depression': {
+    terms: ['depression', 'major depressive disorder', 'MDD', 'psychiatric', 'mental health', 'psychology'],
+    category: 'psychiatry',
+    specialty: 'psychiatry'
+  },
+  'dental': {
+    terms: ['dental', 'dentistry', 'tooth', 'teeth', 'oral', 'maxillofacial'],
+    category: 'dental',
+    specialty: 'dentistry'
+  },
+  'surgery': {
+    terms: ['surgery', 'surgical', 'operation', 'procedure', 'postoperative'],
+    category: 'surgical',
+    specialty: 'surgery'
+  }
 };
 
 // MeSH terms for common conditions
@@ -30,7 +80,10 @@ const MESH_TERMS: { [key: string]: string[] } = {
   'cancer': ['Neoplasms[Mesh]', 'Oncology[Mesh]'],
   'depression': ['Depression[Mesh]', 'Depressive Disorder[Mesh]'],
   'vaccine': ['Vaccines[Mesh]', 'Vaccination[Mesh]'],
-  'surgery': ['Surgery[Mesh]', 'Surgical Procedures[Mesh]']
+  'surgery': ['Surgery[Mesh]', 'Surgical Procedures[Mesh]'],
+  'ra': ['Arthritis, Rheumatoid[Mesh]', 'Rheumatology[Mesh]'],
+  'rheumatoid arthritis': ['Arthritis, Rheumatoid[Mesh]', 'Rheumatology[Mesh]'],
+  'biologics': ['Biological Products[Mesh]', 'Biological Therapy[Mesh]']
 };
 
 // Study type filters with priority
@@ -63,10 +116,122 @@ const hasQualityAbstract = (abstract: string): boolean => {
          abstract.trim().length > 100);
 };
 
-function extractSearchTerms(question: string): { terms: string[], meshTerms: string[] } {
+// Extract primary medical condition from query
+function extractPrimaryCondition(query: string): { condition: string, category: string, specialty: string } | null {
+  const lowerQuery = query.toLowerCase();
+  
+  // Check for specific conditions first
+  for (const [condition, data] of Object.entries(MEDICAL_CONDITIONS)) {
+    if (data.terms.some(term => lowerQuery.includes(term.toLowerCase()))) {
+      return {
+        condition,
+        category: data.category,
+        specialty: data.specialty
+      };
+    }
+  }
+  
+  // Check for abbreviated conditions
+  if (lowerQuery.includes('ra') || lowerQuery.includes('rheumatoid')) {
+    return {
+      condition: 'rheumatoid arthritis',
+      category: 'rheumatology',
+      specialty: 'rheumatology'
+    };
+  }
+  
+  if (lowerQuery.includes('dm') || lowerQuery.includes('diabetes')) {
+    return {
+      condition: 'diabetes',
+      category: 'endocrinology',
+      specialty: 'endocrinology'
+    };
+  }
+  
+  return null;
+}
+
+// Validate paper relevance to primary condition
+function validatePaperRelevance(paper: Paper, primaryCondition: { condition: string, category: string, specialty: string }): boolean {
+  const conditionData = MEDICAL_CONDITIONS[primaryCondition.condition];
+  if (!conditionData) return true; // If no specific condition found, allow all papers
+  
+  const titleLower = paper.title.toLowerCase();
+  const abstractLower = paper.abstract.toLowerCase();
+  const combinedText = `${titleLower} ${abstractLower}`;
+  
+  // Check if paper mentions the primary condition or related terms
+  const hasRelevantTerms = conditionData.terms.some(term => 
+    combinedText.includes(term.toLowerCase())
+  );
+  
+  // Check for conflicting conditions (e.g., dental papers in RA query)
+  const conflictingConditions = Object.entries(MEDICAL_CONDITIONS).filter(([key, data]) => 
+    key !== primaryCondition.condition && data.category !== primaryCondition.category
+  );
+  
+  const hasConflictingTerms = conflictingConditions.some(([key, data]) => {
+    // Skip if it's a general term that might overlap
+    if (key === 'surgery' || key === 'treatment') return false;
+    return data.terms.some(term => combinedText.includes(term.toLowerCase()));
+  });
+  
+  // Paper must have relevant terms AND not have conflicting terms
+  return hasRelevantTerms && !hasConflictingTerms;
+}
+
+// Calculate topic consistency score
+function calculateTopicConsistencyScore(paper: Paper, primaryCondition: { condition: string, category: string, specialty: string }): number {
+  const conditionData = MEDICAL_CONDITIONS[primaryCondition.condition];
+  if (!conditionData) return 50; // Neutral score if no specific condition
+  
+  const titleLower = paper.title.toLowerCase();
+  const abstractLower = paper.abstract.toLowerCase();
+  const combinedText = `${titleLower} ${abstractLower}`;
+  
+  let score = 0;
+  
+  // Bonus for exact condition matches
+  if (combinedText.includes(primaryCondition.condition.toLowerCase())) {
+    score += 30;
+  }
+  
+  // Bonus for related terms
+  conditionData.terms.forEach(term => {
+    if (combinedText.includes(term.toLowerCase())) {
+      score += 10;
+    }
+  });
+  
+  // Bonus for specialty terms
+  if (combinedText.includes(primaryCondition.specialty.toLowerCase())) {
+    score += 15;
+  }
+  
+  // Penalty for conflicting terms
+  const conflictingConditions = Object.entries(MEDICAL_CONDITIONS).filter(([key, data]) => 
+    key !== primaryCondition.condition && data.category !== primaryCondition.category
+  );
+  
+  conflictingConditions.forEach(([key, data]) => {
+    if (key === 'surgery' || key === 'treatment') return; // Skip general terms
+    data.terms.forEach(term => {
+      if (combinedText.includes(term.toLowerCase())) {
+        score -= 20; // Heavy penalty for conflicting terms
+      }
+    });
+  });
+  
+  return Math.max(0, score);
+}
+
+function extractSearchTerms(question: string): { terms: string[], meshTerms: string[], primaryCondition: any } {
   const lowerQuestion = question.toLowerCase();
   const foundTerms: string[] = [];
   const foundMeshTerms: string[] = [];
+  
+  // Extract primary condition first
+  const primaryCondition = extractPrimaryCondition(question);
   
   // Find medical terms and their synonyms
   for (const [term, synonyms] of Object.entries(MEDICAL_SYNONYMS)) {
@@ -86,11 +251,11 @@ function extractSearchTerms(question: string): { terms: string[], meshTerms: str
     foundTerms.push(...words);
   }
   
-  return { terms: foundTerms, meshTerms: foundMeshTerms };
+  return { terms: foundTerms, meshTerms: foundMeshTerms, primaryCondition };
 }
 
-function buildAdvancedQuery(question: string): string {
-  const { terms, meshTerms } = extractSearchTerms(question);
+function buildAdvancedQuery(question: string): { query: string, primaryCondition: any } {
+  const { terms, meshTerms, primaryCondition } = extractSearchTerms(question);
   
   // Build the main search query with synonyms
   const mainTerms = terms.length > 0 ? `(${terms.join(' OR ')})` : question;
@@ -106,18 +271,33 @@ function buildAdvancedQuery(question: string): string {
   const startYear = currentYear - 10;
   const dateQuery = ` AND (${startYear}:${currentYear}[dp])`;
   
+  // Add condition-specific filters if primary condition is identified
+  let conditionQuery = '';
+  if (primaryCondition) {
+    const conditionData = MEDICAL_CONDITIONS[primaryCondition.condition];
+    if (conditionData) {
+      conditionQuery = ` AND (${conditionData.terms.join(' OR ')})`;
+    }
+  }
+  
   // Combine all parts
-  const fullQuery = `${mainTerms}${meshQuery}${studyTypeQuery}${dateQuery}`;
+  const fullQuery = `${mainTerms}${meshQuery}${conditionQuery}${studyTypeQuery}${dateQuery}`;
   
   console.log("Built advanced query:", fullQuery);
-  return fullQuery;
+  console.log("Primary condition:", primaryCondition);
+  
+  return { query: fullQuery, primaryCondition };
 }
 
-function calculateRelevanceScore(paper: Paper, query: string): number {
+function calculateRelevanceScore(paper: Paper, query: string, primaryCondition: any): number {
   let score = 0;
   const lowerQuery = query.toLowerCase();
   const lowerTitle = paper.title.toLowerCase();
   const lowerAbstract = paper.abstract.toLowerCase();
+  
+  // Topic consistency score (heavily weighted)
+  const topicScore = calculateTopicConsistencyScore(paper, primaryCondition);
+  score += topicScore * 2; // Double weight for topic consistency
   
   // Abstract quality penalties and bonuses
   if (!hasQualityAbstract(paper.abstract)) {
@@ -192,8 +372,8 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
   try {
     console.log("Original query:", query);
     
-    // Build advanced search query
-    const advancedQuery = buildAdvancedQuery(query);
+    // Build advanced search query with condition filtering
+    const { query: advancedQuery, primaryCondition } = buildAdvancedQuery(query);
     
     // PubMed scraping logic
     const baseUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
@@ -305,8 +485,14 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
             relevanceScore: 0
           };
           
+          // Validate topic consistency if primary condition is identified
+          if (primaryCondition && !validatePaperRelevance(paper, primaryCondition)) {
+            console.log("Rejecting paper due to topic inconsistency:", title);
+            continue; // Skip this paper
+          }
+          
           // Calculate relevance score
-          paper.relevanceScore = calculateRelevanceScore(paper, query);
+          paper.relevanceScore = calculateRelevanceScore(paper, query, primaryCondition);
           
           allPapers.push(paper);
           
@@ -329,8 +515,8 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
     if (papersWithAbstracts.length < 10) {
       console.log("Not enough papers with abstracts, trying broader search...");
       
-      // Try a simpler query without date restrictions
-      const broaderQuery = buildAdvancedQuery(query).replace(/AND \(20\d{2}:\d{4}\[dp\]\)/, '');
+      // Try a simpler query without date restrictions but keep condition filtering
+      const broaderQuery = buildAdvancedQuery(query).query.replace(/AND \(20\d{2}:\d{4}\[dp\]\)/, '');
       
       const broaderSearchParams = new URLSearchParams({
         db: "pubmed",
@@ -414,7 +600,13 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
                     relevanceScore: 0
                   };
                   
-                  paper.relevanceScore = calculateRelevanceScore(paper, query);
+                  // Validate topic consistency for broader search too
+                  if (primaryCondition && !validatePaperRelevance(paper, primaryCondition)) {
+                    console.log("Rejecting broader paper due to topic inconsistency:", title);
+                    continue;
+                  }
+                  
+                  paper.relevanceScore = calculateRelevanceScore(paper, query, primaryCondition);
                   papersWithAbstracts.push(paper);
                 }
               } catch (error) {
@@ -439,12 +631,14 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
     
     console.log("Total papers with abstracts:", papersWithAbstracts.length);
     console.log("Returning top papers:", topPapers.length);
+    console.log("Primary condition filtered:", primaryCondition?.condition);
     
     return { 
       papers: topPapers,
       totalFound: papersWithAbstracts.length,
       totalSearched: allPapers.length,
-      query: advancedQuery
+      query: advancedQuery,
+      primaryCondition: primaryCondition?.condition
     };
     
   } catch (error) {
