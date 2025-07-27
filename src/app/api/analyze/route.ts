@@ -68,41 +68,55 @@ Total Papers Analyzed: ${papers.length}
 OUTPUT FORMAT: Concise, actionable research intelligence report suitable for healthcare executives.
     `;
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: "You are a senior real-world evidence strategist with expertise in EHR data, claims analysis, and federated clinical networks. Your analysis informs evidence generation strategies for health systems and pharmaceutical companies using real-world data."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        max_tokens: 1500, // Reduced for faster processing
-        temperature: 0.2  // Lower temperature for more consistent, focused output
-      })
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: "gpt-4",
+          messages: [
+            {
+              role: "system",
+              content: "You are a senior real-world evidence strategist with expertise in EHR data, claims analysis, and federated clinical networks. Your analysis informs evidence generation strategies for health systems and pharmaceutical companies using real-world data."
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          max_tokens: 1500, // Reduced for faster processing
+          temperature: 0.2  // Lower temperature for more consistent, focused output
+        }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const analysis = data.choices[0].message.content;
+      
+      return {
+        analysis,
+        papers_analyzed: papers.length,
+        clinical_question: clinicalQuestion
+      };
+    } catch (error: unknown) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Analysis request timed out. Please try again.');
+      }
+      throw error;
     }
-    
-    const data = await response.json();
-    const analysis = data.choices[0].message.content;
-    
-    return {
-      analysis,
-      papers_analyzed: papers.length,
-      clinical_question: clinicalQuestion
-    };
     
   } catch (error) {
     return { error: String(error) };

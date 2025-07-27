@@ -40,11 +40,13 @@ export default function Home() {
     e.preventDefault();
     if (!question.trim()) return;
     
+    // Reset all states immediately when starting a new search
     setLoading(true);
     setError(null);
     setResults([]);
     setAnalysis(null);
     setAnalysisError(null);
+    setAnalyzing(false);
     setExpandedPapers(new Set());
     
     try {
@@ -70,7 +72,13 @@ export default function Home() {
   };
 
   const handleExampleClick = (example: string) => {
+    // Reset all analysis states when clicking an example
     setQuestion(example);
+    setResults([]);
+    setAnalysis(null);
+    setAnalysisError(null);
+    setAnalyzing(false);
+    setExpandedPapers(new Set());
   };
 
   const togglePaperExpansion = (index: number) => {
@@ -86,6 +94,9 @@ export default function Home() {
   useEffect(() => {
     const analyze = async () => {
       if (results.length === 0) return;
+      
+      // Add a small delay to ensure UI updates properly
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       setAnalyzing(true);
       setAnalysis(null);
@@ -115,7 +126,13 @@ export default function Home() {
         }
         
         const data = await res.json();
-        setAnalysis(data);
+        
+        // Verify the analysis is for the current question
+        if (data.clinical_question === question) {
+          setAnalysis(data);
+        } else {
+          console.log("Analysis received for different question, discarding");
+        }
       } catch (err: unknown) {
         console.error("Error in analyze:", err);
         setAnalysisError(err instanceof Error ? err.message : "An error occurred during analysis");
