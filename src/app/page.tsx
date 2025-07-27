@@ -112,7 +112,7 @@ export default function Home() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
             question, 
-            results: results.map((paper: any) => ({
+            results: results.map((paper: PubMedResult) => ({
               title: paper.title,
               abstract: paper.abstract || "",
               authors: paper.authors || [],
