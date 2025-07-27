@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 async function scrapePubMed(query: string, maxResults: number = 5) {
   try {
+    console.log("Scraping PubMed for query:", query);
+    
     // PubMed scraping logic
     const baseUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
     
@@ -14,16 +16,22 @@ async function scrapePubMed(query: string, maxResults: number = 5) {
       retmode: "json"
     });
     
+    console.log("Search URL:", `${searchUrl}?${searchParams}`);
     const searchResponse = await fetch(`${searchUrl}?${searchParams}`);
     const searchData = await searchResponse.json();
     
+    console.log("Search response:", searchData);
+    
     if (!searchData.esearchresult) {
+      console.error("No esearchresult in response");
       return { error: "Failed to search PubMed" };
     }
     
     const idList = searchData.esearchresult.idlist;
+    console.log("Found IDs:", idList);
     
     if (!idList || idList.length === 0) {
+      console.log("No papers found for query:", query);
       return { papers: [] };
     }
     
@@ -35,12 +43,17 @@ async function scrapePubMed(query: string, maxResults: number = 5) {
       retmode: "xml"
     });
     
+    console.log("Fetch URL:", `${fetchUrl}?${fetchParams}`);
     const fetchResponse = await fetch(`${fetchUrl}?${fetchParams}`);
     const xmlText = await fetchResponse.text();
+    
+    console.log("XML response length:", xmlText.length);
     
     // Simple XML parsing (we'll use regex for basic extraction)
     const papers = [];
     const articleMatches = xmlText.match(/<PubmedArticle>([\s\S]*?)<\/PubmedArticle>/g);
+    
+    console.log("Found article matches:", articleMatches ? articleMatches.length : 0);
     
     if (articleMatches) {
       for (const article of articleMatches) {
@@ -71,15 +84,20 @@ async function scrapePubMed(query: string, maxResults: number = 5) {
             abstract,
             authors
           });
+          
+          console.log("Added paper:", title);
         } catch {
+          console.log("Failed to parse article");
           continue;
         }
       }
     }
     
+    console.log("Total papers found:", papers.length);
     return { papers };
     
   } catch (error) {
+    console.error("Error in scrapePubMed:", error);
     return { error: String(error) };
   }
 }
@@ -90,7 +108,11 @@ export async function POST(request: NextRequest) {
     const query = body.question || '';
     const maxResults = body.max_results || 5;
     
+    console.log("Received request for query:", query);
+    
     const result = await scrapePubMed(query, maxResults);
+    console.log("Returning result:", result);
+    
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error in scrape API route:', error);
