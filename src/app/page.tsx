@@ -95,7 +95,18 @@ export default function Home() {
         const res = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question, results }),
+          body: JSON.stringify({ 
+            question, 
+            results: results.map(paper => ({
+              title: paper.title,
+              abstract: paper.abstract || "",
+              authors: paper.authors || [],
+              journal: paper.journal,
+              pubDate: paper.pubDate,
+              pmid: paper.pmid,
+              relevanceScore: paper.relevanceScore
+            }))
+          }),
         });
         
         if (!res.ok) {
@@ -375,11 +386,17 @@ export default function Home() {
                       </div>
                     </div>
                     
-                    <div className="prose prose-green max-w-none">
-                      <div className="whitespace-pre-line text-green-800 leading-relaxed">
-                        {analysis.analysis}
+                    {analysis.analysis ? (
+                      <div className="bg-white rounded-lg p-6 border border-green-200 max-h-96 overflow-y-auto">
+                        <div className="text-gray-800 leading-relaxed whitespace-pre-line text-sm">
+                          {analysis.analysis}
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="bg-white rounded-lg p-6 border border-green-200">
+                        <p className="text-gray-600 text-center">Analysis content is being processed...</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
