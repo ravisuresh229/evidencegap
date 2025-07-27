@@ -116,8 +116,15 @@ const hasQualityAbstract = (abstract: string): boolean => {
          abstract.trim().length > 100);
 };
 
+// Interface for primary condition
+interface PrimaryCondition {
+  condition: string;
+  category: string;
+  specialty: string;
+}
+
 // Extract primary medical condition from query
-function extractPrimaryCondition(query: string): { condition: string, category: string, specialty: string } | null {
+function extractPrimaryCondition(query: string): PrimaryCondition | null {
   const lowerQuery = query.toLowerCase();
   
   // Check for specific conditions first
@@ -152,7 +159,7 @@ function extractPrimaryCondition(query: string): { condition: string, category: 
 }
 
 // Validate paper relevance to primary condition
-function validatePaperRelevance(paper: Paper, primaryCondition: { condition: string, category: string, specialty: string }): boolean {
+function validatePaperRelevance(paper: Paper, primaryCondition: PrimaryCondition): boolean {
   const conditionData = MEDICAL_CONDITIONS[primaryCondition.condition];
   if (!conditionData) return true; // If no specific condition found, allow all papers
   
@@ -181,7 +188,7 @@ function validatePaperRelevance(paper: Paper, primaryCondition: { condition: str
 }
 
 // Calculate topic consistency score
-function calculateTopicConsistencyScore(paper: Paper, primaryCondition: { condition: string, category: string, specialty: string }): number {
+function calculateTopicConsistencyScore(paper: Paper, primaryCondition: PrimaryCondition): number {
   const conditionData = MEDICAL_CONDITIONS[primaryCondition.condition];
   if (!conditionData) return 50; // Neutral score if no specific condition
   
@@ -225,7 +232,7 @@ function calculateTopicConsistencyScore(paper: Paper, primaryCondition: { condit
   return Math.max(0, score);
 }
 
-function extractSearchTerms(question: string): { terms: string[], meshTerms: string[], primaryCondition: any } {
+function extractSearchTerms(question: string): { terms: string[], meshTerms: string[], primaryCondition: PrimaryCondition | null } {
   const lowerQuestion = question.toLowerCase();
   const foundTerms: string[] = [];
   const foundMeshTerms: string[] = [];
@@ -254,7 +261,7 @@ function extractSearchTerms(question: string): { terms: string[], meshTerms: str
   return { terms: foundTerms, meshTerms: foundMeshTerms, primaryCondition };
 }
 
-function buildAdvancedQuery(question: string): { query: string, primaryCondition: any } {
+function buildAdvancedQuery(question: string): { query: string, primaryCondition: PrimaryCondition | null } {
   const { terms, meshTerms, primaryCondition } = extractSearchTerms(question);
   
   // Build the main search query with synonyms
@@ -289,15 +296,17 @@ function buildAdvancedQuery(question: string): { query: string, primaryCondition
   return { query: fullQuery, primaryCondition };
 }
 
-function calculateRelevanceScore(paper: Paper, query: string, primaryCondition: any): number {
+function calculateRelevanceScore(paper: Paper, query: string, primaryCondition: PrimaryCondition | null): number {
   let score = 0;
   const lowerQuery = query.toLowerCase();
   const lowerTitle = paper.title.toLowerCase();
   const lowerAbstract = paper.abstract.toLowerCase();
   
   // Topic consistency score (heavily weighted)
-  const topicScore = calculateTopicConsistencyScore(paper, primaryCondition);
-  score += topicScore * 2; // Double weight for topic consistency
+  if (primaryCondition) {
+    const topicScore = calculateTopicConsistencyScore(paper, primaryCondition);
+    score += topicScore * 2; // Double weight for topic consistency
+  }
   
   // Abstract quality penalties and bonuses
   if (!hasQualityAbstract(paper.abstract)) {
