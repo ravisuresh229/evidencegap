@@ -107,13 +107,26 @@ interface Paper {
 }
 
 // Abstract quality check function
-const hasQualityAbstract = (abstract: string): boolean => {
-  return Boolean(abstract && 
-         abstract.length > 100 && 
+// Progressive filtering strategy
+const hasQualityAbstract = (abstract: string, filterLevel: 'high' | 'medium' | 'low' = 'high'): boolean => {
+  const baseCheck = Boolean(abstract && 
          !abstract.includes("No abstract available") &&
          !abstract.includes("Abstract not available") &&
          !abstract.includes("No abstract") &&
-         abstract.trim().length > 100);
+         abstract.trim().length > 0);
+  
+  if (!baseCheck) return false;
+  
+  switch (filterLevel) {
+    case 'high':
+      return abstract.length > 200;
+    case 'medium':
+      return abstract.length > 100;
+    case 'low':
+      return abstract.length > 50;
+    default:
+      return abstract.length > 100;
+  }
 };
 
 // Interface for primary condition
@@ -499,7 +512,8 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
           // Validate topic consistency if primary condition is identified
           if (primaryCondition && !validatePaperRelevance(paper, primaryCondition)) {
             console.log("Rejecting paper due to topic inconsistency:", title);
-            continue; // Skip this paper
+            // Don't skip - just reduce the score instead
+            paper.relevanceScore = -50; // Heavy penalty but don't exclude
           }
           
           // Calculate relevance score
@@ -515,15 +529,29 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
       }
     }
     
-    // Filter papers with quality abstracts
-    const papersWithAbstracts = allPapers.filter(paper => hasQualityAbstract(paper.abstract));
-    console.log(`Papers with quality abstracts: ${papersWithAbstracts.length}/${allPapers.length}`);
+    // Progressive filtering strategy
+    let papersWithAbstracts = allPapers.filter(paper => hasQualityAbstract(paper.abstract, 'high'));
+    console.log(`High quality papers: ${papersWithAbstracts.length}/${allPapers.length}`);
+    
+    // If not enough high quality papers, try medium quality
+    if (papersWithAbstracts.length < 5) {
+      console.log("Not enough high quality papers, trying medium quality...");
+      papersWithAbstracts = allPapers.filter(paper => hasQualityAbstract(paper.abstract, 'medium'));
+      console.log(`Medium quality papers: ${papersWithAbstracts.length}/${allPapers.length}`);
+    }
+    
+    // If still not enough, try low quality
+    if (papersWithAbstracts.length < 3) {
+      console.log("Not enough medium quality papers, trying low quality...");
+      papersWithAbstracts = allPapers.filter(paper => hasQualityAbstract(paper.abstract, 'low'));
+      console.log(`Low quality papers: ${papersWithAbstracts.length}/${allPapers.length}`);
+    }
     
     // Sort papers by relevance score (highest first)
     papersWithAbstracts.sort((a, b) => b.relevanceScore - a.relevanceScore);
     
-    // If we don't have enough papers with abstracts, try a broader search
-    if (papersWithAbstracts.length < 10) {
+    // If we still don't have enough papers, try a broader search
+    if (papersWithAbstracts.length < 3) {
       console.log("Not enough papers with abstracts, trying broader search...");
       
       // Try a simpler query without date restrictions but keep condition filtering
@@ -567,7 +595,7 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
                 const abstract = abstractMatch ? abstractMatch[1] : "No abstract available";
                 
                 // Only add if we don't already have this paper
-                if (!papersWithAbstracts.some(p => p.title === title) && hasQualityAbstract(abstract)) {
+                if (!papersWithAbstracts.some(p => p.title === title) && hasQualityAbstract(abstract, 'low')) {
                   const authors = [];
                   const authorMatches = article.match(/<Author>([\s\S]*?)<\/Author>/g);
                   if (authorMatches) {
@@ -614,7 +642,8 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
                   // Validate topic consistency for broader search too
                   if (primaryCondition && !validatePaperRelevance(paper, primaryCondition)) {
                     console.log("Rejecting broader paper due to topic inconsistency:", title);
-                    continue;
+                    // Don't skip - just reduce the score instead
+                    paper.relevanceScore = -50; // Heavy penalty but don't exclude
                   }
                   
                   paper.relevanceScore = calculateRelevanceScore(paper, query, primaryCondition);
@@ -635,8 +664,8 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
       papersWithAbstracts.sort((a, b) => b.relevanceScore - a.relevanceScore);
     }
     
-    // Return top results (ensure minimum 10 if available)
-    const minResults = Math.min(10, papersWithAbstracts.length);
+    // Return top results (ensure minimum 3-5 papers if they exist)
+    const minResults = Math.min(3, papersWithAbstracts.length);
     const targetResults = Math.max(minResults, Math.min(maxResults, papersWithAbstracts.length));
     const topPapers = papersWithAbstracts.slice(0, targetResults);
     

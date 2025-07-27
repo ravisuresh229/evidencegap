@@ -35,12 +35,14 @@ export default function Home() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [expandedPapers, setExpandedPapers] = useState<Set<number>>(new Set());
+  const [loadingStage, setLoadingStage] = useState<string>("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!question.trim()) return;
     
     setLoading(true);
+    setLoadingStage("Searching PubMed...");
     setError(null);
     setResults([]);
     setAnalysis(null);
@@ -62,11 +64,20 @@ export default function Home() {
       
       const data = await res.json();
       setResults(data.papers || []);
+      
+      if (data.papers && data.papers.length > 0) {
+        setLoadingStage("Filtering results...");
+        // Simulate filtering time
+        setTimeout(() => {
+          setLoadingStage("Analyzing evidence...");
+        }, 2000);
+      }
     } catch (err: unknown) {
       console.error("Search error:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
+      setLoadingStage("");
     }
   };
 
@@ -92,13 +103,23 @@ export default function Home() {
 
   useEffect(() => {
     const analyze = async () => {
-      if (results.length === 0) return;
+      if (results.length === 0) {
+        console.log("No results to analyze, skipping");
+        setAnalyzing(false);
+        setAnalysisError("No relevant papers found. Try a broader search term or different keywords.");
+        return;
+      }
       
-      console.log("Starting analysis for:", question, "with", results.length, "papers");
-      
-      setAnalyzing(true);
-      setAnalysis(null);
-      setAnalysisError(null);
+              console.log("Starting analysis for:", question, "with", results.length, "papers");
+        
+        setAnalyzing(true);
+        setAnalysis(null);
+        setAnalysisError(null);
+        
+        // Set timeout warning after 30 seconds
+        const timeoutWarning = setTimeout(() => {
+          setAnalysisError("Analysis taking longer than expected. Please refresh or try a different search.");
+        }, 30000);
       
       try {
                 console.log("Sending API request...");
@@ -146,6 +167,7 @@ export default function Home() {
         setAnalysisError(err instanceof Error ? err.message : "Analysis failed");
       } finally {
         console.log("Analysis complete, setting analyzing to false");
+        clearTimeout(timeoutWarning);
         setAnalyzing(false);
       }
     };
@@ -229,7 +251,7 @@ export default function Home() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                     </svg>
-                    Analyzing...
+                    {loadingStage || "Analyzing..."}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
@@ -398,18 +420,38 @@ export default function Home() {
                       <span className="font-medium">Analysis Error</span>
                     </div>
                     <p className="text-red-600 text-sm">{analysisError}</p>
-                    <p className="text-red-500 text-xs mt-2">The analysis failed to complete. Please try again with a different question.</p>
-                    <button 
-                      onClick={() => {
-                        setAnalysisError(null);
-                        setAnalyzing(true);
-                        // Trigger re-analysis by updating results
-                        setResults([...results]);
-                      }}
-                      className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors"
-                    >
-                      Retry Analysis
-                    </button>
+                    <p className="text-red-500 text-xs mt-2">
+                      {analysisError.includes("No relevant papers found") 
+                        ? "Try using broader search terms or different keywords."
+                        : "The analysis failed to complete. Please try again with a different question."
+                      }
+                    </p>
+                    <div className="flex gap-2 mt-3">
+                      <button 
+                        onClick={() => {
+                          setAnalysisError(null);
+                          setAnalyzing(true);
+                          // Trigger re-analysis by updating results
+                          setResults([...results]);
+                        }}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors"
+                      >
+                        Retry Analysis
+                      </button>
+                      {analysisError.includes("No relevant papers found") && (
+                        <button 
+                          onClick={() => {
+                            setQuestion("");
+                            setResults([]);
+                            setAnalysis(null);
+                            setAnalysisError(null);
+                          }}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors"
+                        >
+                          Try New Search
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 
