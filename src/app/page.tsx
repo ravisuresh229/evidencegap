@@ -40,6 +40,8 @@ export default function Home() {
     e.preventDefault();
     if (!question.trim()) return;
     
+    console.log("🔍 Starting search for:", question);
+    
     // Reset all states immediately when starting a new search
     setLoading(true);
     setError(null);
@@ -50,23 +52,31 @@ export default function Home() {
     setExpandedPapers(new Set());
     
     try {
+      console.log("📤 Sending scrape request...");
       const res = await fetch("/api/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question }),
       });
       
+      console.log(`📥 Scrape response status: ${res.status}`);
+      
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.detail || "Failed to fetch results");
+        console.error("❌ Scrape failed:", data);
+        throw new Error(data.error || data.detail || "Failed to fetch results");
       }
       
       const data = await res.json();
+      console.log("📊 Scrape response:", data);
+      console.log(`📄 Papers found: ${data.papers?.length || 0}`);
+      
       setResults(data.papers || []);
     } catch (err: unknown) {
-      console.error("Error in handleSubmit:", err);
+      console.error("❌ Error in handleSubmit:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
+      console.log("🏁 Search complete, setting loading to false");
       setLoading(false);
     }
   };
@@ -95,6 +105,10 @@ export default function Home() {
     const analyze = async () => {
       if (results.length === 0) return;
       
+      console.log("🔄 Starting analysis useEffect");
+      console.log(`📊 Results length: ${results.length}`);
+      console.log(`🎯 Question: "${question}"`);
+      
       // Add a small delay to ensure UI updates properly
       await new Promise(resolve => setTimeout(resolve, 100));
       
@@ -103,40 +117,53 @@ export default function Home() {
       setAnalysisError(null);
       
       try {
+        console.log("📤 Sending analysis request...");
+        const requestBody = { 
+          question, 
+          results: results.map(paper => ({
+            title: paper.title,
+            abstract: paper.abstract || "",
+            authors: paper.authors || [],
+            journal: paper.journal,
+            pubDate: paper.pubDate,
+            pmid: paper.pmid,
+            relevanceScore: paper.relevanceScore
+          }))
+        };
+        console.log("📋 Request body:", requestBody);
+        
         const res = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            question, 
-            results: results.map(paper => ({
-              title: paper.title,
-              abstract: paper.abstract || "",
-              authors: paper.authors || [],
-              journal: paper.journal,
-              pubDate: paper.pubDate,
-              pmid: paper.pmid,
-              relevanceScore: paper.relevanceScore
-            }))
-          }),
+          body: JSON.stringify(requestBody),
         });
         
+        console.log(`📥 Response status: ${res.status}`);
+        
         if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.detail || "Failed to analyze evidence gap");
+          const errorData = await res.json();
+          console.error("❌ Response not OK:", errorData);
+          throw new Error(errorData.error || errorData.detail || `HTTP ${res.status}: Failed to analyze evidence gap`);
         }
         
         const data = await res.json();
+        console.log("📊 Analysis response:", data);
         
         // Verify the analysis is for the current question
         if (data.clinical_question === question) {
+          console.log("✅ Analysis matches current question, setting analysis");
           setAnalysis(data);
         } else {
-          console.log("Analysis received for different question, discarding");
+          console.log("⚠️ Analysis received for different question, discarding");
+          console.log(`Expected: "${question}", Got: "${data.clinical_question}"`);
         }
       } catch (err: unknown) {
-        console.error("Error in analyze:", err);
-        setAnalysisError(err instanceof Error ? err.message : "An error occurred during analysis");
+        console.error("❌ Error in analyze:", err);
+        const errorMessage = err instanceof Error ? err.message : "An error occurred during analysis";
+        console.error("❌ Setting analysis error:", errorMessage);
+        setAnalysisError(errorMessage);
       } finally {
+        console.log("🏁 Analysis useEffect complete, setting analyzing to false");
         setAnalyzing(false);
       }
     };
@@ -376,6 +403,7 @@ export default function Home() {
                       <span className="text-lg font-semibold text-blue-800">Analyzing Evidence Intelligence</span>
                     </div>
                     <p className="text-blue-700">Our AI is analyzing the research landscape and identifying key evidence gaps...</p>
+                    <p className="text-blue-600 text-sm mt-2">Analyzing {results.length} papers for "{question}"</p>
                   </div>
                 )}
 
@@ -389,6 +417,17 @@ export default function Home() {
                     </div>
                     <p className="text-red-600 text-sm">{analysisError}</p>
                     <p className="text-red-500 text-xs mt-2">The analysis failed to complete. Please try again with a different question.</p>
+                    <button 
+                      onClick={() => {
+                        setAnalysisError(null);
+                        setAnalyzing(true);
+                        // Trigger re-analysis by updating results
+                        setResults([...results]);
+                      }}
+                      className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors"
+                    >
+                      Retry Analysis
+                    </button>
                   </div>
                 )}
 
