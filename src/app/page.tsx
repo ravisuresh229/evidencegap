@@ -5,18 +5,15 @@ import React, { useState, useEffect } from "react";
 interface PubMedResult {
   title: string;
   abstract?: string;
-  authors?: string;
+  authors?: string[];
   publication_date?: string;
   pmid?: string;
   url?: string;
 }
 
 interface Analysis {
-  summary: string;
-  evidence_gaps: string[];
-  research_suggestions: string[];
-  confidence_score: number;
-  priorities: string[];
+  analysis: string;
+  papers_analyzed: number;
 }
 
 export default function Home() {
@@ -31,24 +28,30 @@ export default function Home() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Submit clicked with question:", question);
     setLoading(true);
     setError(null);
     setResults([]);
     setAnalysis(null);
     setAnalysisError(null);
     try {
+      console.log("Making API call to /api/scrape");
       const res = await fetch("/api/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question }),
       });
+      console.log("Response status:", res.status);
       if (!res.ok) {
         const data = await res.json();
+        console.error("API error:", data);
         throw new Error(data.detail || "Failed to fetch results");
       }
       const data = await res.json();
-      setResults(data.papers || data);
+      console.log("API response:", data);
+      setResults(data.papers || []);
     } catch (err: unknown) {
+      console.error("Error in handleSubmit:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
@@ -58,22 +61,28 @@ export default function Home() {
   useEffect(() => {
     const analyze = async () => {
       if (results.length === 0) return;
+      console.log("Starting analysis with results:", results);
       setAnalyzing(true);
       setAnalysis(null);
       setAnalysisError(null);
       try {
+        console.log("Making API call to /api/analyze");
         const res = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question, results }),
         });
+        console.log("Analyze response status:", res.status);
         if (!res.ok) {
           const data = await res.json();
+          console.error("Analyze API error:", data);
           throw new Error(data.detail || "Failed to analyze evidence gap");
         }
         const data = await res.json();
-        setAnalysis(data.analysis ? { analysis: data.analysis } : data);
+        console.log("Analyze API response:", data);
+        setAnalysis(data);
       } catch (err: unknown) {
+        console.error("Error in analyze:", err);
         setAnalysisError(err instanceof Error ? err.message : "An error occurred during analysis");
       } finally {
         setAnalyzing(false);
@@ -120,16 +129,17 @@ export default function Home() {
         {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
         {results.length > 0 && (
           <div className="mt-6 max-h-96 overflow-y-auto border-t border-blue-100 pt-4">
-            <h2 className="text-lg font-bold text-blue-800 mb-2">PubMed Results</h2>
+            <h2 className="text-lg font-bold text-blue-800 mb-2">PubMed Results ({results.length} papers)</h2>
             <ul className="flex flex-col gap-4">
               {results.map((item, idx) => (
-                <li key={item.pmid || idx} className="bg-blue-50 rounded-lg p-4 shadow-sm border border-blue-100">
-                  <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-blue-900 font-semibold hover:underline">
+                <li key={idx} className="bg-blue-50 rounded-lg p-4 shadow-sm border border-blue-100">
+                  <div className="text-blue-900 font-semibold mb-2">
                     {item.title}
-                  </a>
-                  <div className="text-xs text-blue-700 mb-1">{item.authors} | {item.publication_date}</div>
+                  </div>
+                  <div className="text-xs text-blue-700 mb-1">
+                    {item.authors && item.authors.length > 0 ? item.authors.join(', ') : 'No authors listed'}
+                  </div>
                   {item.abstract && <div className="text-sm text-blue-800 mt-2">{item.abstract}</div>}
-                  <div className="text-xs text-blue-500 mt-2">PMID: {item.pmid}</div>
                 </li>
               ))}
             </ul>
@@ -151,36 +161,11 @@ export default function Home() {
           <div className="mt-8 p-6 rounded-xl bg-green-50 border border-green-200 shadow flex flex-col gap-4">
             <h2 className="text-xl font-bold text-green-900 mb-2">Evidence Gap Analysis</h2>
             <div>
-              <span className="font-semibold text-green-800">Summary:</span>
-              <div className="text-green-900 mt-1">{analysis.summary}</div>
+              <span className="font-semibold text-green-800">Analysis:</span>
+              <div className="text-green-900 mt-1 whitespace-pre-line">{analysis.analysis}</div>
             </div>
-            <div>
-              <span className="font-semibold text-green-800">Evidence Gaps:</span>
-              <ul className="list-disc ml-6 mt-1 text-green-900">
-                {analysis.evidence_gaps.map((gap, i) => (
-                  <li key={i}>{gap}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <span className="font-semibold text-green-800">Suggested Research:</span>
-              <ul className="list-decimal ml-6 mt-1 text-green-900">
-                {analysis.research_suggestions.map((sugg, i) => (
-                  <li key={i}>{sugg}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="font-semibold text-green-800">Confidence Score:</span>
-              <div className="text-green-900">{(analysis.confidence_score * 100).toFixed(1)}%</div>
-            </div>
-            <div>
-              <span className="font-semibold text-green-800">Research Priorities:</span>
-              <ul className="list-disc ml-6 mt-1 text-green-900">
-                {analysis.priorities.map((priority, i) => (
-                  <li key={i}>{priority}</li>
-                ))}
-              </ul>
+            <div className="text-sm text-green-700">
+              Papers analyzed: {analysis.papers_analyzed}
             </div>
         </div>
         )}
