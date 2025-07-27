@@ -75,9 +75,9 @@ const analyzeQuery = (query: string): QueryAnalysis => {
   const intervention = interventions.find(interv => lowerQuery.includes(interv)) || null;
   
   // Split query into important terms (remove common words)
-  const stopWords = ['the', 'of', 'in', 'for', 'and', 'or', 'what', 'is', 'effectiveness', 'efficacy', 'outcomes', 'long', 'term', 'term', 'early', 'novel'];
+  const stopWords = ['the', 'of', 'in', 'and', 'or', 'what', 'is', 'effectiveness', 'efficacy', 'outcomes', 'long', 'term', 'early', 'novel'];
   const words = query.toLowerCase().split(' ').filter(word => 
-    word.length > 2 && !stopWords.includes(word)
+    word.length > 1 && !stopWords.includes(word)
   );
   
   return {
@@ -93,7 +93,7 @@ const validatePaperRelevance = (paper: Paper, queryAnalysis: QueryAnalysis): boo
   const abstract = paper.abstract?.toLowerCase() || '';
   const fullText = `${title} ${abstract}`;
   
-  // MUST contain at least 2 primary terms OR 1 primary + medical condition
+  // More flexible matching logic
   const primaryMatches = queryAnalysis.primaryTerms.filter(term => 
     fullText.includes(term)
   ).length;
@@ -104,10 +104,11 @@ const validatePaperRelevance = (paper: Paper, queryAnalysis: QueryAnalysis): boo
   const hasIntervention = queryAnalysis.intervention ? 
     fullText.includes(queryAnalysis.intervention) : false;
   
-  // Scoring logic
+  // More flexible scoring logic
   if (primaryMatches >= 2) return true;
   if (primaryMatches >= 1 && (hasCondition || hasIntervention)) return true;
   if (hasCondition && hasIntervention) return true;
+  if (primaryMatches >= 1) return true; // Allow single primary term matches
   
   return false;
 };
@@ -214,10 +215,17 @@ const filterAndScorePapers = (papers: Paper[], queryAnalysis: QueryAnalysis) => 
 
 const searchPubMedWithFallback = async (query: string) => {
   const queryAnalysis = analyzeQuery(query);
+  console.log(`🔍 Query analysis for "${query}":`, {
+    primaryTerms: queryAnalysis.primaryTerms,
+    secondaryTerms: queryAnalysis.secondaryTerms,
+    medicalCondition: queryAnalysis.medicalCondition,
+    intervention: queryAnalysis.intervention
+  });
   
   try {
     // Primary search
     const pubmedQuery = buildPubMedQuery(query);
+    console.log(`🔍 PubMed query: "${pubmedQuery}"`);
     let papers = await searchPubMed(pubmedQuery);
     
     if (papers.length === 0) {
@@ -227,9 +235,15 @@ const searchPubMedWithFallback = async (query: string) => {
     }
     
     if (papers.length === 0) {
-      // Fallback 2: Individual term search
-      const singleTermQuery = `"${queryAnalysis.primaryTerms[0]}"[tw] AND (2018:2024[dp])`;
+      // Fallback 2: Individual term search with broader date range
+      const singleTermQuery = `"${queryAnalysis.primaryTerms[0]}"[tw] AND (2015:2024[dp])`;
       papers = await searchPubMed(singleTermQuery);
+    }
+    
+    if (papers.length === 0) {
+      // Fallback 3: Search without date restrictions
+      const noDateQuery = queryAnalysis.primaryTerms.map(term => `"${term}"[tw]`).join(' AND ');
+      papers = await searchPubMed(noDateQuery);
     }
     
     // Filter and score results
@@ -431,11 +445,13 @@ export async function POST(request: NextRequest) {
     }
     
     console.log(`✅ Scrape completed: ${result.papers?.length || 0} papers found`);
+    console.log(`📄 Papers found:`, result.papers?.map(p => p.title.substring(0, 50) + '...'));
     return NextResponse.json(result);
   } catch (error) {
     console.error('❌ Error in scrape API route:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return NextResponse.json(
-      { error: 'Failed to scrape PubMed. Please try again.' },
+      { error: `Failed to scrape PubMed: ${errorMessage}` },
       { status: 500 }
     );
   }
