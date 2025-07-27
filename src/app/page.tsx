@@ -94,17 +94,25 @@ export default function Home() {
     const analyze = async () => {
       if (results.length === 0) return;
       
+      console.log("Starting analysis for:", question, "with", results.length, "papers");
+      
       setAnalyzing(true);
       setAnalysis(null);
       setAnalysisError(null);
       
       try {
+                console.log("Sending API request...");
+        
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+        
         const res = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
             question, 
-            results: results.map(paper => ({
+            results: results.map((paper: any) => ({
               title: paper.title,
               abstract: paper.abstract || "",
               authors: paper.authors || [],
@@ -114,14 +122,21 @@ export default function Home() {
               relevanceScore: paper.relevanceScore
             }))
           }),
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
+        
+        console.log("API response received, status:", res.status);
         
         if (!res.ok) {
           const errorData = await res.json();
+          console.error("API error:", errorData);
           throw new Error(errorData.error || `Analysis failed (${res.status})`);
         }
         
         const data = await res.json();
+        console.log("Analysis data received:", data);
         
         if (data.clinical_question === question) {
           setAnalysis(data);
@@ -130,6 +145,7 @@ export default function Home() {
         console.error("Analysis error:", err);
         setAnalysisError(err instanceof Error ? err.message : "Analysis failed");
       } finally {
+        console.log("Analysis complete, setting analyzing to false");
         setAnalyzing(false);
       }
     };
