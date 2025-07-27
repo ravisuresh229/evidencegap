@@ -29,62 +29,43 @@ async function analyzePapers(papers: Paper[], clinicalQuestion: string) {
       papersText += `Relevance Score: ${paper.relevanceScore || 'N/A'}\n\n`;
     }
     
-    // Professional healthcare strategy consultant prompt
+    // Atropos Health real-world evidence focused prompt
     const prompt = `
-You are a senior healthcare strategy consultant analyzing medical literature for pharmaceutical and biotech companies. Your analysis will inform $10M+ research investment decisions.
+You are a senior real-world evidence strategist at a leading healthcare AI company. Your analysis will inform evidence generation priorities for health systems, pharma, and researchers using federated clinical data networks.
 
-CLIENT CONTEXT: Healthcare executives need actionable intelligence on research gaps that represent commercial opportunities and regulatory requirements.
+**REAL-WORLD EVIDENCE FOCUS:**
+- Identify gaps that can be filled with observational studies using EHR/claims data
+- Highlight opportunities for comparative effectiveness research
+- Focus on evidence needed at point-of-care for clinical decision-making
 
-ANALYSIS FRAMEWORK:
+**FEDERATED DATA OPPORTUNITIES:**
+- Which gaps could be addressed using multi-institutional data networks?
+- What research questions need large-scale, diverse patient populations?
+- How can real-world data complement traditional clinical trials?
 
-MARKET LANDSCAPE ASSESSMENT
-- Current standard of care and treatment algorithms
-- Key players (pharma companies, academic centers) in this space
-- Regulatory environment (FDA guidance, label requirements)
-- Market size and unmet medical need ($$ impact)
+**EVIDENCE GENERATION STRATEGY:**
+For each gap, specify:
+- **RWE Study Design**: Retrospective cohort, case-control, or registry study
+- **Data Requirements**: EHR elements, claims codes, patient registries needed
+- **Federated Network Value**: Why multi-site data improves this research
+- **Clinical Decision Impact**: How results change treatment algorithms
+- **Publication Potential**: Target journals, regulatory submissions
 
-EVIDENCE QUALITY AUDIT
-- Study design hierarchy: Systematic reviews > RCTs > observational studies
-- Sample size adequacy and statistical power
-- Follow-up duration vs. clinically meaningful endpoints
-- Population representativeness (age, gender, comorbidities, geography)
-- Primary vs. surrogate endpoints used
+**COMPETITIVE LANDSCAPE:**
+- Current evidence generation timelines (months/years)
+- How rapid RWE could accelerate insights
+- Opportunities for "evidence at the speed of care"
 
-PRIORITY RESEARCH GAPS
-For each gap, provide structured analysis:
-Gap 1: [Specific Description]
-- Clinical Impact: Patient populations affected, current treatment limitations
-- Commercial Value: Market size, competitive advantage potential, pricing impact
-- Regulatory Pathway: FDA requirements, potential label expansion opportunities
-- Study Design: Specific trial design (Phase II/III, primary endpoints, inclusion criteria)
-- Timeline & Investment: 3-7 year timeline, estimated cost ($5M-$50M range)
-- Execution Risk: Recruitment feasibility, regulatory hurdles, competitive threats
-- ROI Potential: Revenue impact if successful, probability of success
+**FORMAT**: Research intelligence report for healthcare CxOs making evidence strategy decisions.
 
-(Repeat for 3-5 priority gaps)
-
-STRATEGIC RECOMMENDATIONS
-- Immediate Opportunities (0-2 years): Quick wins, registry studies, real-world evidence
-- Medium-term Investments (2-5 years): Pivotal trials, regulatory submissions
-- Long-term Innovation (5+ years): Novel mechanisms, combination therapies
-- Partnership Opportunities: Academic collaborations, CRO partnerships, regulatory consultants
-
-COMPETITIVE INTELLIGENCE
-- Who else is investing in this space?
-- What trials are currently recruiting?
-- Patent landscape and exclusivity considerations
-- Potential acquisition targets or licensing opportunities
-
-TONE: Executive summary style. Think McKinsey healthcare practice meets FDA regulatory guidance. Focus on actionable insights with clear ROI implications.
-
-LENGTH: Comprehensive but scannable. Use headers, bullet points, and structured sections.
+Focus on actionable research that can be executed using real-world clinical data networks, not traditional pharmaceutical clinical trials.
 
 INPUT DATA:
 Clinical Question: ${clinicalQuestion}
 Research Papers: ${papersText}
 Total Papers Analyzed: ${papers.length}
 
-OUTPUT FORMAT: Professional research intelligence report suitable for C-suite presentation.
+OUTPUT FORMAT: Concise, actionable research intelligence report suitable for healthcare executives.
     `;
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -98,15 +79,15 @@ OUTPUT FORMAT: Professional research intelligence report suitable for C-suite pr
         messages: [
           {
             role: "system",
-            content: "You are a senior healthcare strategy consultant with expertise in pharmaceutical R&D, FDA regulations, and market analysis. Your analysis informs multi-million dollar investment decisions for pharmaceutical and biotech companies."
+            content: "You are a senior real-world evidence strategist with expertise in EHR data, claims analysis, and federated clinical networks. Your analysis informs evidence generation strategies for health systems and pharmaceutical companies using real-world data."
           },
           {
             role: "user",
             content: prompt
           }
         ],
-        max_tokens: 2000,
-        temperature: 0.3
+        max_tokens: 1500, // Reduced for faster processing
+        temperature: 0.2  // Lower temperature for more consistent, focused output
       })
     });
     

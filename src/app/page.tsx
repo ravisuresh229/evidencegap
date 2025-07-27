@@ -155,28 +155,28 @@ export default function Home() {
             GENEVA Evidence Gap Detector
           </h1>
           <p className="text-xl md:text-2xl text-blue-100 mb-8 max-w-2xl mx-auto leading-relaxed">
-            AI-powered research intelligence for evidence-based medicine
+            Real-world evidence intelligence for federated clinical data networks
           </p>
-          <div className="flex items-center justify-center gap-4 text-blue-200">
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-              <span>FDA-Compliant Analysis</span>
+                      <div className="flex items-center justify-center gap-4 text-blue-200">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span>Federated Data Networks</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                <span>Real-World Evidence</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                <span>Point-of-Care Insights</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
-              </svg>
-              <span>Real-time Research</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-              </svg>
-              <span>Evidence-Based Insights</span>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -381,8 +381,8 @@ export default function Home() {
                         </svg>
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-green-900">Analysis Complete</h3>
-                        <p className="text-green-700 text-sm">{analysis.papers_analyzed} papers analyzed</p>
+                        <h3 className="text-lg font-semibold text-green-900">Real-World Evidence Analysis Complete</h3>
+                        <p className="text-green-700 text-sm">{analysis.papers_analyzed} papers analyzed for RWE opportunities</p>
                       </div>
                     </div>
                     
@@ -394,7 +394,13 @@ export default function Home() {
                       </div>
                     ) : (
                       <div className="bg-white rounded-lg p-6 border border-green-200">
-                        <p className="text-gray-600 text-center">Analysis content is being processed...</p>
+                        <div className="flex items-center justify-center gap-3">
+                          <svg className="animate-spin h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                          </svg>
+                          <p className="text-gray-600">Generating real-world evidence insights...</p>
+                        </div>
                       </div>
                     )}
                   </div>
