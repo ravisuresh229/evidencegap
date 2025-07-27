@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-async function analyzePapers(papers: any[]) {
+interface Paper {
+  title: string;
+  abstract: string;
+  authors: string[];
+}
+
+async function analyzePapers(papers: Paper[]) {
   try {
     if (!papers || papers.length === 0) {
       return { error: "No papers provided" };

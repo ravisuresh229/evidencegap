@@ -71,7 +71,7 @@ async function scrapePubMed(query: string, maxResults: number = 5) {
             abstract,
             authors
           });
-        } catch (e) {
+        } catch {
           continue;
         }
       }
