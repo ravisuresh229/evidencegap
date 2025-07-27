@@ -47,7 +47,7 @@ export default function Home() {
         throw new Error(data.detail || "Failed to fetch results");
       }
       const data = await res.json();
-      setResults(data);
+      setResults(data.papers || data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -72,7 +72,7 @@ export default function Home() {
           throw new Error(data.detail || "Failed to analyze evidence gap");
         }
         const data = await res.json();
-        setAnalysis(data);
+        setAnalysis(data.analysis ? { analysis: data.analysis } : data);
       } catch (err: unknown) {
         setAnalysisError(err instanceof Error ? err.message : "An error occurred during analysis");
       } finally {
