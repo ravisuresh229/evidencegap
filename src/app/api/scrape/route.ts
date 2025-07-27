@@ -8,7 +8,7 @@ function extractSearchTerms(question: string): string {
   const medicalTerms = [
     'metformin', 'diabetes', 'type 2', 'type 1', 'insulin', 'glucose',
     'hypertension', 'blood pressure', 'cholesterol', 'obesity',
-    'cancer', 'cancer', 'tumor', 'oncology', 'chemotherapy',
+    'cancer', 'tumor', 'oncology', 'chemotherapy',
     'heart disease', 'cardiovascular', 'stroke', 'heart attack',
     'depression', 'anxiety', 'mental health', 'psychiatry',
     'vaccine', 'immunization', 'infection', 'antibiotic',
@@ -17,6 +17,8 @@ function extractSearchTerms(question: string): string {
   
   // Find medical terms in the question
   const foundTerms = medicalTerms.filter(term => lowerQuestion.includes(term));
+  
+  console.log("Found medical terms:", foundTerms);
   
   if (foundTerms.length > 0) {
     // Use the found medical terms
