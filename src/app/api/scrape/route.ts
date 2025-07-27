@@ -53,6 +53,16 @@ interface Paper {
   relevanceScore: number;
 }
 
+// Abstract quality check function
+const hasQualityAbstract = (abstract: string): boolean => {
+  return Boolean(abstract && 
+         abstract.length > 100 && 
+         !abstract.includes("No abstract available") &&
+         !abstract.includes("Abstract not available") &&
+         !abstract.includes("No abstract") &&
+         abstract.trim().length > 100);
+};
+
 function extractSearchTerms(question: string): { terms: string[], meshTerms: string[] } {
   const lowerQuestion = question.toLowerCase();
   const foundTerms: string[] = [];
@@ -109,17 +119,30 @@ function calculateRelevanceScore(paper: Paper, query: string): number {
   const lowerTitle = paper.title.toLowerCase();
   const lowerAbstract = paper.abstract.toLowerCase();
   
+  // Abstract quality penalties and bonuses
+  if (!hasQualityAbstract(paper.abstract)) {
+    score -= 50; // Heavy penalty for missing/poor abstracts
+  } else {
+    // Abstract presence bonus
+    score += 20;
+    
+    // Abstract length bonuses
+    if (paper.abstract.length < 200) {
+      score -= 20; // Penalty for short abstracts
+    } else if (paper.abstract.length > 500) {
+      score += 10; // Bonus for substantial abstracts
+    }
+    
+    // Abstract relevance
+    const queryWords = lowerQuery.split(' ').filter(word => word.length > 3);
+    const abstractMatches = queryWords.filter(word => lowerAbstract.includes(word)).length;
+    score += (abstractMatches / queryWords.length) * 20;
+  }
+  
   // Title relevance (highest weight)
   const queryWords = lowerQuery.split(' ').filter(word => word.length > 3);
   const titleMatches = queryWords.filter(word => lowerTitle.includes(word)).length;
   score += (titleMatches / queryWords.length) * 40;
-  
-  // Abstract presence and relevance
-  if (paper.abstract && paper.abstract !== "No abstract available") {
-    score += 20;
-    const abstractMatches = queryWords.filter(word => lowerAbstract.includes(word)).length;
-    score += (abstractMatches / queryWords.length) * 20;
-  }
   
   // Study type priority
   const studyTypePriority = {
@@ -175,12 +198,12 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
     // PubMed scraping logic
     const baseUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
     
-    // Search for papers with increased results
+    // Search for papers with increased results to compensate for filtering
     const searchUrl = `${baseUrl}esearch.fcgi`;
     const searchParams = new URLSearchParams({
       db: "pubmed",
       term: advancedQuery,
-      retmax: Math.max(maxResults, 20).toString(), // Ensure at least 20 results
+      retmax: "40", // Fetch 40 initial results to filter down
       retmode: "json",
       sort: "relevance" // Sort by relevance
     });
@@ -219,7 +242,7 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
     console.log("XML response length:", xmlText.length);
     
     // Parse XML and extract papers with relevance scoring
-    const papers = [];
+    const allPapers: Paper[] = [];
     const articleMatches = xmlText.match(/<PubmedArticle>([\s\S]*?)<\/PubmedArticle>/g);
     
     console.log("Found article matches:", articleMatches ? articleMatches.length : 0);
@@ -272,7 +295,7 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
           const pmidMatch = article.match(/<PMID>([^<]*)<\/PMID>/);
           const pmid = pmidMatch ? pmidMatch[1] : null;
           
-          const paper = {
+          const paper: Paper = {
             title,
             abstract,
             authors,
@@ -285,9 +308,9 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
           // Calculate relevance score
           paper.relevanceScore = calculateRelevanceScore(paper, query);
           
-          papers.push(paper);
+          allPapers.push(paper);
           
-          console.log("Added paper:", title, "Score:", paper.relevanceScore);
+          console.log("Added paper:", title, "Score:", paper.relevanceScore, "Has abstract:", hasQualityAbstract(abstract));
         } catch (error) {
           console.log("Failed to parse article:", error);
           continue;
@@ -295,18 +318,132 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
       }
     }
     
+    // Filter papers with quality abstracts
+    const papersWithAbstracts = allPapers.filter(paper => hasQualityAbstract(paper.abstract));
+    console.log(`Papers with quality abstracts: ${papersWithAbstracts.length}/${allPapers.length}`);
+    
     // Sort papers by relevance score (highest first)
-    papers.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    papersWithAbstracts.sort((a, b) => b.relevanceScore - a.relevanceScore);
     
-    // Return top results
-    const topPapers = papers.slice(0, maxResults);
+    // If we don't have enough papers with abstracts, try a broader search
+    if (papersWithAbstracts.length < 10) {
+      console.log("Not enough papers with abstracts, trying broader search...");
+      
+      // Try a simpler query without date restrictions
+      const broaderQuery = buildAdvancedQuery(query).replace(/AND \(20\d{2}:\d{4}\[dp\]\)/, '');
+      
+      const broaderSearchParams = new URLSearchParams({
+        db: "pubmed",
+        term: broaderQuery,
+        retmax: "60", // Even more results for broader search
+        retmode: "json",
+        sort: "relevance"
+      });
+      
+      try {
+        const broaderSearchResponse = await fetch(`${searchUrl}?${broaderSearchParams}`);
+        const broaderSearchData = await broaderSearchResponse.json();
+        
+        if (broaderSearchData.esearchresult && broaderSearchData.esearchresult.idlist) {
+          const broaderIdList = broaderSearchData.esearchresult.idlist;
+          
+          // Fetch broader results
+          const broaderFetchParams = new URLSearchParams({
+            db: "pubmed",
+            id: broaderIdList.join(","),
+            retmode: "xml"
+          });
+          
+          const broaderFetchResponse = await fetch(`${fetchUrl}?${broaderFetchParams}`);
+          const broaderXmlText = await broaderFetchResponse.text();
+          
+          // Parse broader results
+          const broaderArticleMatches = broaderXmlText.match(/<PubmedArticle>([\s\S]*?)<\/PubmedArticle>/g);
+          
+          if (broaderArticleMatches) {
+            for (const article of broaderArticleMatches) {
+              try {
+                const titleMatch = article.match(/<ArticleTitle>([^<]*)<\/ArticleTitle>/);
+                const title = titleMatch ? titleMatch[1] : "No title available";
+                
+                const abstractMatch = article.match(/<AbstractText>([^<]*)<\/AbstractText>/);
+                const abstract = abstractMatch ? abstractMatch[1] : "No abstract available";
+                
+                // Only add if we don't already have this paper
+                if (!papersWithAbstracts.some(p => p.title === title) && hasQualityAbstract(abstract)) {
+                  const authors = [];
+                  const authorMatches = article.match(/<Author>([\s\S]*?)<\/Author>/g);
+                  if (authorMatches) {
+                    for (const author of authorMatches) {
+                      const lastNameMatch = author.match(/<LastName>([^<]*)<\/LastName>/);
+                      const firstNameMatch = author.match(/<ForeName>([^<]*)<\/ForeName>/);
+                      if (lastNameMatch && firstNameMatch) {
+                        authors.push(`${firstNameMatch[1]} ${lastNameMatch[1]}`);
+                      }
+                    }
+                  }
+                  
+                  const journalMatch = article.match(/<Journal>([\s\S]*?)<\/Journal>/);
+                  let journal = "Unknown Journal";
+                  if (journalMatch) {
+                    const titleMatch = journalMatch[1].match(/<Title>([^<]*)<\/Title>/);
+                    if (titleMatch) {
+                      journal = titleMatch[1];
+                    }
+                  }
+                  
+                  const pubDateMatch = article.match(/<PubDate>([\s\S]*?)<\/PubDate>/);
+                  let pubDate = null;
+                  if (pubDateMatch) {
+                    const yearMatch = pubDateMatch[1].match(/<Year>([^<]*)<\/Year>/);
+                    if (yearMatch) {
+                      pubDate = yearMatch[1];
+                    }
+                  }
+                  
+                  const pmidMatch = article.match(/<PMID>([^<]*)<\/PMID>/);
+                  const pmid = pmidMatch ? pmidMatch[1] : null;
+                  
+                  const paper: Paper = {
+                    title,
+                    abstract,
+                    authors,
+                    journal,
+                    pubDate,
+                    pmid,
+                    relevanceScore: 0
+                  };
+                  
+                  paper.relevanceScore = calculateRelevanceScore(paper, query);
+                  papersWithAbstracts.push(paper);
+                }
+              } catch (error) {
+                console.log("Failed to parse broader article:", error);
+                continue;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.log("Broader search failed:", error);
+      }
+      
+      // Re-sort after adding broader results
+      papersWithAbstracts.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    }
     
-    console.log("Total papers found:", papers.length);
+    // Return top results (ensure minimum 10 if available)
+    const minResults = Math.min(10, papersWithAbstracts.length);
+    const targetResults = Math.max(minResults, Math.min(maxResults, papersWithAbstracts.length));
+    const topPapers = papersWithAbstracts.slice(0, targetResults);
+    
+    console.log("Total papers with abstracts:", papersWithAbstracts.length);
     console.log("Returning top papers:", topPapers.length);
     
     return { 
       papers: topPapers,
-      totalFound: papers.length,
+      totalFound: papersWithAbstracts.length,
+      totalSearched: allPapers.length,
       query: advancedQuery
     };
     
