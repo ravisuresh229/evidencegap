@@ -132,8 +132,8 @@ export default function Home() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
-            question, 
-            results: results.map((paper: PubMedResult) => ({
+            query: question, 
+            papers: results.map((paper: PubMedResult) => ({
               title: paper.title,
               abstract: paper.abstract || "",
               authors: paper.authors || [],
@@ -159,8 +159,12 @@ export default function Home() {
         const data = await res.json();
         console.log("Analysis data received:", data);
         
-        if (data.clinical_question === question) {
-          setAnalysis(data);
+        if (data.analysis) {
+          setAnalysis({
+            analysis: data.analysis,
+            papers_analyzed: results.length,
+            clinical_question: question
+          });
         }
       } catch (err: unknown) {
         console.error("Analysis error:", err);
