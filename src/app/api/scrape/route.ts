@@ -1,8 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+function extractSearchTerms(question: string): string {
+  // Extract key medical terms from the question
+  const lowerQuestion = question.toLowerCase();
+  
+  // Common medical terms to look for
+  const medicalTerms = [
+    'metformin', 'diabetes', 'type 2', 'type 1', 'insulin', 'glucose',
+    'hypertension', 'blood pressure', 'cholesterol', 'obesity',
+    'cancer', 'cancer', 'tumor', 'oncology', 'chemotherapy',
+    'heart disease', 'cardiovascular', 'stroke', 'heart attack',
+    'depression', 'anxiety', 'mental health', 'psychiatry',
+    'vaccine', 'immunization', 'infection', 'antibiotic',
+    'surgery', 'surgical', 'procedure', 'operation'
+  ];
+  
+  // Find medical terms in the question
+  const foundTerms = medicalTerms.filter(term => lowerQuestion.includes(term));
+  
+  if (foundTerms.length > 0) {
+    // Use the found medical terms
+    return foundTerms.join(' AND ');
+  }
+  
+  // If no medical terms found, use the first few words
+  const words = question.split(' ').slice(0, 4);
+  return words.join(' ');
+}
+
 async function scrapePubMed(query: string, maxResults: number = 5) {
   try {
-    console.log("Scraping PubMed for query:", query);
+    console.log("Original query:", query);
+    
+    // Extract search terms from the question
+    const searchTerms = extractSearchTerms(query);
+    console.log("Extracted search terms:", searchTerms);
     
     // PubMed scraping logic
     const baseUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
@@ -11,7 +43,7 @@ async function scrapePubMed(query: string, maxResults: number = 5) {
     const searchUrl = `${baseUrl}esearch.fcgi`;
     const searchParams = new URLSearchParams({
       db: "pubmed",
-      term: query,
+      term: searchTerms,
       retmax: maxResults.toString(),
       retmode: "json"
     });
@@ -31,7 +63,7 @@ async function scrapePubMed(query: string, maxResults: number = 5) {
     console.log("Found IDs:", idList);
     
     if (!idList || idList.length === 0) {
-      console.log("No papers found for query:", query);
+      console.log("No papers found for query:", searchTerms);
       return { papers: [] };
     }
     
