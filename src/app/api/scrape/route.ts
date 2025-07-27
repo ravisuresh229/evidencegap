@@ -88,7 +88,7 @@ const analyzeQuery = (query: string): QueryAnalysis => {
   };
 };
 
-const validatePaperRelevance = (paper: any, queryAnalysis: QueryAnalysis): boolean => {
+const validatePaperRelevance = (paper: Paper, queryAnalysis: QueryAnalysis): boolean => {
   const title = paper.title?.toLowerCase() || '';
   const abstract = paper.abstract?.toLowerCase() || '';
   const fullText = `${title} ${abstract}`;
@@ -143,7 +143,7 @@ const buildPubMedQuery = (userQuery: string): string => {
   return queryParts.join(' AND ');
 };
 
-const calculateRelevanceScore = (paper: any, queryAnalysis: QueryAnalysis): number => {
+const calculateRelevanceScore = (paper: Paper, queryAnalysis: QueryAnalysis): number => {
   const title = paper.title?.toLowerCase() || '';
   const abstract = paper.abstract?.toLowerCase() || '';
   const fullText = `${title} ${abstract}`;
@@ -179,7 +179,7 @@ const calculateRelevanceScore = (paper: any, queryAnalysis: QueryAnalysis): numb
   return score;
 };
 
-const filterAndScorePapers = (papers: any[], queryAnalysis: QueryAnalysis) => {
+const filterAndScorePapers = (papers: Paper[], queryAnalysis: QueryAnalysis) => {
   // Stage 1: Relevance filtering
   const relevantPapers = papers.filter(paper => 
     validatePaperRelevance(paper, queryAnalysis)
@@ -243,70 +243,71 @@ const searchPubMedWithFallback = async (query: string) => {
     
   } catch (error) {
     console.error('Search error:', error);
-    throw new Error(`Search failed: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Search failed: ${errorMessage}`);
   }
 };
 
 async function searchPubMed(query: string) {
-  const baseUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
-  
-  // Search for papers
-  const searchUrl = `${baseUrl}esearch.fcgi`;
-  const searchParams = new URLSearchParams({
-    db: "pubmed",
+    const baseUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
+    
+    // Search for papers
+    const searchUrl = `${baseUrl}esearch.fcgi`;
+    const searchParams = new URLSearchParams({
+      db: "pubmed",
     term: query,
     retmax: "50",
     retmode: "json",
     sort: "relevance"
   });
   
-  const searchResponse = await fetch(`${searchUrl}?${searchParams}`);
-  const searchData = await searchResponse.json();
-  
+    const searchResponse = await fetch(`${searchUrl}?${searchParams}`);
+    const searchData = await searchResponse.json();
+    
   if (!searchData.esearchresult || !searchData.esearchresult.idlist) {
     return [];
-  }
-  
-  const idList = searchData.esearchresult.idlist;
-  
-  // Fetch paper details
-  const fetchUrl = `${baseUrl}efetch.fcgi`;
-  const fetchParams = new URLSearchParams({
-    db: "pubmed",
-    id: idList.join(","),
-    retmode: "xml"
-  });
-  
-  const fetchResponse = await fetch(`${fetchUrl}?${fetchParams}`);
-  const xmlText = await fetchResponse.text();
-  
+    }
+    
+    const idList = searchData.esearchresult.idlist;
+    
+    // Fetch paper details
+    const fetchUrl = `${baseUrl}efetch.fcgi`;
+    const fetchParams = new URLSearchParams({
+      db: "pubmed",
+      id: idList.join(","),
+      retmode: "xml"
+    });
+    
+    const fetchResponse = await fetch(`${fetchUrl}?${fetchParams}`);
+    const xmlText = await fetchResponse.text();
+    
   // Parse XML and extract papers
   const papers: Paper[] = [];
-  const articleMatches = xmlText.match(/<PubmedArticle>([\s\S]*?)<\/PubmedArticle>/g);
-  
-  if (articleMatches) {
-    for (const article of articleMatches) {
-      try {
-        // Extract title
-        const titleMatch = article.match(/<ArticleTitle>([^<]*)<\/ArticleTitle>/);
-        const title = titleMatch ? titleMatch[1] : "No title available";
-        
-        // Extract abstract
-        const abstractMatch = article.match(/<AbstractText>([^<]*)<\/AbstractText>/);
-        const abstract = abstractMatch ? abstractMatch[1] : "No abstract available";
-        
-        // Extract authors
-        const authors = [];
-        const authorMatches = article.match(/<Author>([\s\S]*?)<\/Author>/g);
-        if (authorMatches) {
-          for (const author of authorMatches) {
-            const lastNameMatch = author.match(/<LastName>([^<]*)<\/LastName>/);
-            const firstNameMatch = author.match(/<ForeName>([^<]*)<\/ForeName>/);
-            if (lastNameMatch && firstNameMatch) {
-              authors.push(`${firstNameMatch[1]} ${lastNameMatch[1]}`);
+    const articleMatches = xmlText.match(/<PubmedArticle>([\s\S]*?)<\/PubmedArticle>/g);
+    
+    if (articleMatches) {
+      for (const article of articleMatches) {
+        try {
+          // Extract title
+          const titleMatch = article.match(/<ArticleTitle>([^<]*)<\/ArticleTitle>/);
+          const title = titleMatch ? titleMatch[1] : "No title available";
+          
+          // Extract abstract
+          const abstractMatch = article.match(/<AbstractText>([^<]*)<\/AbstractText>/);
+          const abstract = abstractMatch ? abstractMatch[1] : "No abstract available";
+          
+          // Extract authors
+          const authors = [];
+          const authorMatches = article.match(/<Author>([\s\S]*?)<\/Author>/g);
+          if (authorMatches) {
+            for (const author of authorMatches) {
+              const lastNameMatch = author.match(/<LastName>([^<]*)<\/LastName>/);
+              const firstNameMatch = author.match(/<ForeName>([^<]*)<\/ForeName>/);
+              if (lastNameMatch && firstNameMatch) {
+                authors.push(`${firstNameMatch[1]} ${lastNameMatch[1]}`);
+              }
             }
           }
-        }
         
         // Extract journal
         const journalMatch = article.match(/<Journal>([\s\S]*?)<\/Journal>/);
@@ -331,10 +332,10 @@ async function searchPubMed(query: string) {
         // Extract PMID
         const pmidMatch = article.match(/<PMID>([^<]*)<\/PMID>/);
         const pmid = pmidMatch ? pmidMatch[1] : null;
-        
-        papers.push({
-          title,
-          abstract,
+          
+          papers.push({
+            title,
+            abstract,
           authors,
           journal,
           pubDate,
@@ -343,11 +344,11 @@ async function searchPubMed(query: string) {
         });
       } catch (error) {
         console.log("Failed to parse article:", error);
-        continue;
+          continue;
+        }
       }
     }
-  }
-  
+    
   return papers;
 }
 
