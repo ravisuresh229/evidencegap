@@ -12,11 +12,15 @@ interface Paper {
 
 async function analyzePapers(papers: Paper[], clinicalQuestion: string) {
   try {
+    console.log(`🔬 Starting analysis for ${papers.length} papers`);
+    
     if (!papers || papers.length === 0) {
+      console.error("❌ No papers provided to analyzePapers");
       return { error: "No papers provided" };
     }
     
     // Prepare papers for analysis
+    console.log("📝 Preparing papers text for analysis...");
     let papersText = "";
     for (let i = 0; i < papers.length; i++) {
       const paper = papers[i];
@@ -28,6 +32,7 @@ async function analyzePapers(papers: Paper[], clinicalQuestion: string) {
       papersText += `Publication Date: ${paper.pubDate || 'N/A'}\n`;
       papersText += `Relevance Score: ${paper.relevanceScore || 'N/A'}\n\n`;
     }
+    console.log(`📄 Prepared ${papers.length} papers for analysis`);
     
     // Atropos Health real-world evidence focused prompt
     const prompt = `
@@ -68,6 +73,7 @@ Total Papers Analyzed: ${papers.length}
 OUTPUT FORMAT: Concise, actionable research intelligence report suitable for healthcare executives.
     `;
     
+    console.log("🤖 Calling OpenAI API...");
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
@@ -99,11 +105,20 @@ OUTPUT FORMAT: Concise, actionable research intelligence report suitable for hea
       clearTimeout(timeoutId);
       
       if (!response.ok) {
+        console.error(`❌ OpenAI API error: ${response.status}`);
         throw new Error(`OpenAI API error: ${response.status}`);
       }
       
       const data = await response.json();
+      console.log("📊 Received OpenAI response");
+      
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        console.error("❌ Invalid OpenAI response format:", data);
+        throw new Error("Invalid response from OpenAI API");
+      }
+      
       const analysis = data.choices[0].message.content;
+      console.log(`✅ Analysis generated successfully (${analysis.length} characters)`);
       
       return {
         analysis,
@@ -113,8 +128,10 @@ OUTPUT FORMAT: Concise, actionable research intelligence report suitable for hea
     } catch (error: unknown) {
       clearTimeout(timeoutId);
       if (error instanceof Error && error.name === 'AbortError') {
+        console.error("⏰ Analysis request timed out");
         throw new Error('Analysis request timed out. Please try again.');
       }
+      console.error("❌ Error during OpenAI API call:", error);
       throw error;
     }
     
@@ -125,16 +142,48 @@ OUTPUT FORMAT: Concise, actionable research intelligence report suitable for hea
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("🔍 Analysis API called");
+    
     const body = await request.json();
     const papers = body.results || [];
     const clinicalQuestion = body.question || 'Clinical research analysis';
     
+    console.log(`📊 Received ${papers.length} papers for analysis`);
+    console.log(`🎯 Clinical question: ${clinicalQuestion}`);
+    
+    if (!papers || papers.length === 0) {
+      console.error("❌ No papers provided for analysis");
+      return NextResponse.json(
+        { error: 'No papers provided for analysis' },
+        { status: 400 }
+      );
+    }
+    
+    if (!clinicalQuestion || clinicalQuestion.trim() === '') {
+      console.error("❌ No clinical question provided");
+      return NextResponse.json(
+        { error: 'No clinical question provided' },
+        { status: 400 }
+      );
+    }
+    
+    console.log("🚀 Starting analysis...");
     const result = await analyzePapers(papers, clinicalQuestion);
+    
+    if (result.error) {
+      console.error("❌ Analysis failed:", result.error);
+      return NextResponse.json(
+        { error: result.error },
+        { status: 500 }
+      );
+    }
+    
+    console.log("✅ Analysis completed successfully");
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error in analyze API route:', error);
+    console.error('❌ Error in analyze API route:', error);
     return NextResponse.json(
-      { error: 'Failed to analyze papers' },
+      { error: 'Failed to analyze papers. Please try again.' },
       { status: 500 }
     );
   }

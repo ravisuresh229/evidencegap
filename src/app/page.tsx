@@ -169,29 +169,29 @@ export default function Home() {
         
         <div className="relative max-w-4xl mx-auto text-center">
           <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 tracking-tight">
-            GENEVA Evidence Gap Detector
+            AETHER Evidence Intelligence Platform
           </h1>
           <p className="text-xl md:text-2xl text-blue-100 mb-8 max-w-2xl mx-auto leading-relaxed">
-            Real-world evidence intelligence for federated clinical data networks
+            Accelerating evidence discovery with AI
           </p>
                       <div className="flex items-center justify-center gap-4 text-blue-200">
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
-                <span>Federated Data Networks</span>
+                <span>AI-Powered Analysis</span>
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
                 </svg>
-                <span>Real-World Evidence</span>
+                <span>Evidence Discovery</span>
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                 </svg>
-                <span>Point-of-Care Insights</span>
+                <span>Research Intelligence</span>
               </div>
             </div>
         </div>
@@ -227,7 +227,7 @@ export default function Home() {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
-                    Analyze Evidence Gaps
+                    Analyze Evidence Intelligence
                   </div>
                 )}
               </button>
@@ -253,12 +253,14 @@ export default function Home() {
 
           {error && (
             <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-              <div className="flex items-center gap-2 text-red-700">
+              <div className="flex items-center gap-2 text-red-700 mb-2">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                 </svg>
-                <span className="font-medium">Error: {error}</span>
+                <span className="font-medium">Search Error</span>
               </div>
+              <p className="text-red-600 text-sm">{error}</p>
+              <p className="text-red-500 text-xs mt-2">Try rephrasing your question or using one of the example questions below.</p>
             </div>
           )}
         </div>
@@ -353,7 +355,7 @@ export default function Home() {
               {/* Evidence Gap Analysis */}
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-gray-900">Evidence Gap Analysis</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">Evidence Intelligence Analysis</h2>
                   {analysis && (
                     <button className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -371,7 +373,7 @@ export default function Home() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                       </svg>
-                      <span className="text-lg font-semibold text-blue-800">Analyzing Evidence Gaps</span>
+                      <span className="text-lg font-semibold text-blue-800">Analyzing Evidence Intelligence</span>
                     </div>
                     <p className="text-blue-700">Our AI is analyzing the research landscape and identifying key evidence gaps...</p>
                   </div>
@@ -385,7 +387,8 @@ export default function Home() {
                       </svg>
                       <span className="font-medium">Analysis Error</span>
                     </div>
-                    <p className="text-red-600">{analysisError}</p>
+                    <p className="text-red-600 text-sm">{analysisError}</p>
+                    <p className="text-red-500 text-xs mt-2">The analysis failed to complete. Please try again with a different question.</p>
                   </div>
                 )}
 
@@ -398,7 +401,7 @@ export default function Home() {
                         </svg>
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-green-900">Real-World Evidence Analysis Complete</h3>
+                        <h3 className="text-lg font-semibold text-green-900">Evidence Intelligence Analysis Complete</h3>
                         <p className="text-green-700 text-sm">{analysis.papers_analyzed} papers analyzed for RWE opportunities</p>
                       </div>
                     </div>
@@ -416,7 +419,7 @@ export default function Home() {
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                           </svg>
-                          <p className="text-gray-600">Generating real-world evidence insights...</p>
+                          <p className="text-gray-600">Generating evidence intelligence insights...</p>
                         </div>
                       </div>
                     )}
@@ -437,10 +440,10 @@ export default function Home() {
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
               </svg>
             </div>
-            <span className="text-xl font-bold text-white">GENEVA</span>
+            <span className="text-xl font-bold text-white">AETHER</span>
           </div>
           <p className="text-sm">
-            © {new Date().getFullYear()} GENEVA Evidence Gap Detector. Professional research intelligence for evidence-based medicine.
+            © {new Date().getFullYear()} AETHER Evidence Intelligence Platform. Accelerating evidence discovery with AI.
           </p>
         </div>
       </footer>

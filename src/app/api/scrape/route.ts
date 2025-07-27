@@ -379,6 +379,8 @@ function calculateRelevanceScore(paper: Paper, query: string, primaryCondition: 
 
 async function scrapePubMed(query: string, maxResults: number = 20) {
   try {
+    console.log(`🔬 Starting PubMed scrape for query: "${query}"`);
+    console.log(`📊 Target results: ${maxResults}`);
     console.log("Original query:", query);
     
     // Build advanced search query with condition filtering
@@ -658,20 +660,40 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("🔍 Scrape API called");
+    
     const body = await request.json();
     const query = body.question || '';
     const maxResults = body.max_results || 20; // Default to 20 results
     
-    console.log("Received request for query:", query);
+    console.log(`📝 Query: "${query}"`);
+    console.log(`📊 Max results: ${maxResults}`);
     
+    if (!query || query.trim() === '') {
+      console.error("❌ Empty query provided");
+      return NextResponse.json(
+        { error: 'No query provided' },
+        { status: 400 }
+      );
+    }
+    
+    console.log("🚀 Starting PubMed scrape...");
     const result = await scrapePubMed(query, maxResults);
-    console.log("Returning result:", result);
     
+    if (result.error) {
+      console.error("❌ Scrape failed:", result.error);
+      return NextResponse.json(
+        { error: result.error },
+        { status: 500 }
+      );
+    }
+    
+    console.log(`✅ Scrape completed: ${result.papers?.length || 0} papers found`);
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error in scrape API route:', error);
+    console.error('❌ Error in scrape API route:', error);
     return NextResponse.json(
-      { error: 'Failed to scrape PubMed' },
+      { error: 'Failed to scrape PubMed. Please try again.' },
       { status: 500 }
     );
   }
