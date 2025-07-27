@@ -10,14 +10,6 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
-        # Set CORS headers
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
-        
         try:
             # Get request body
             content_length = int(self.headers['Content-Length'])
@@ -43,12 +35,20 @@ class handler(BaseHTTPRequestHandler):
             search_data = search_response.json()
             
             if "esearchresult" not in search_data:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
                 self.wfile.write(json.dumps({"error": "Failed to search PubMed"}).encode())
                 return
             
             id_list = search_data["esearchresult"]["idlist"]
             
             if not id_list:
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
                 self.wfile.write(json.dumps({"papers": []}).encode())
                 return
             
@@ -89,9 +89,18 @@ class handler(BaseHTTPRequestHandler):
                 except Exception as e:
                     continue
             
+            # Send successful response
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
             self.wfile.write(json.dumps({"papers": papers}).encode())
             
         except Exception as e:
+            self.send_response(500)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
             self.wfile.write(json.dumps({"error": str(e)}).encode())
     
     def do_OPTIONS(self):
