@@ -136,23 +136,18 @@ OUTPUT FORMAT: Concise, actionable research intelligence report suitable for hea
     }
     
   } catch (error) {
-    return { error: String(error) };
+    console.error("❌ Error in analyzePapers:", error);
+    throw error; // Re-throw to be handled by the main POST handler
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("🔍 Analysis API called");
-    
     const body = await request.json();
     const papers = body.results || [];
     const clinicalQuestion = body.question || 'Clinical research analysis';
     
-    console.log(`📊 Received ${papers.length} papers for analysis`);
-    console.log(`🎯 Clinical question: ${clinicalQuestion}`);
-    
     if (!papers || papers.length === 0) {
-      console.error("❌ No papers provided for analysis");
       return NextResponse.json(
         { error: 'No papers provided for analysis' },
         { status: 400 }
@@ -160,28 +155,24 @@ export async function POST(request: NextRequest) {
     }
     
     if (!clinicalQuestion || clinicalQuestion.trim() === '') {
-      console.error("❌ No clinical question provided");
       return NextResponse.json(
         { error: 'No clinical question provided' },
         { status: 400 }
       );
     }
     
-    console.log("🚀 Starting analysis...");
     const result = await analyzePapers(papers, clinicalQuestion);
     
     if (result.error) {
-      console.error("❌ Analysis failed:", result.error);
       return NextResponse.json(
         { error: result.error },
         { status: 500 }
       );
     }
     
-    console.log("✅ Analysis completed successfully");
     return NextResponse.json(result);
   } catch (error) {
-    console.error('❌ Error in analyze API route:', error);
+    console.error('Analysis API error:', error);
     return NextResponse.json(
       { error: 'Failed to analyze papers. Please try again.' },
       { status: 500 }

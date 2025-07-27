@@ -40,9 +40,6 @@ export default function Home() {
     e.preventDefault();
     if (!question.trim()) return;
     
-    console.log("🔍 Starting search for:", question);
-    
-    // Reset all states immediately when starting a new search
     setLoading(true);
     setError(null);
     setResults([]);
@@ -52,31 +49,23 @@ export default function Home() {
     setExpandedPapers(new Set());
     
     try {
-      console.log("📤 Sending scrape request...");
       const res = await fetch("/api/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question }),
       });
       
-      console.log(`📥 Scrape response status: ${res.status}`);
-      
       if (!res.ok) {
         const data = await res.json();
-        console.error("❌ Scrape failed:", data);
-        throw new Error(data.error || data.detail || "Failed to fetch results");
+        throw new Error(data.error || "Failed to fetch results");
       }
       
       const data = await res.json();
-      console.log("📊 Scrape response:", data);
-      console.log(`📄 Papers found: ${data.papers?.length || 0}`);
-      
       setResults(data.papers || []);
     } catch (err: unknown) {
-      console.error("❌ Error in handleSubmit:", err);
+      console.error("Search error:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
-      console.log("🏁 Search complete, setting loading to false");
       setLoading(false);
     }
   };
@@ -105,65 +94,42 @@ export default function Home() {
     const analyze = async () => {
       if (results.length === 0) return;
       
-      console.log("🔄 Starting analysis useEffect");
-      console.log(`📊 Results length: ${results.length}`);
-      console.log(`🎯 Question: "${question}"`);
-      
-      // Add a small delay to ensure UI updates properly
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
       setAnalyzing(true);
       setAnalysis(null);
       setAnalysisError(null);
       
       try {
-        console.log("📤 Sending analysis request...");
-        const requestBody = { 
-          question, 
-          results: results.map(paper => ({
-            title: paper.title,
-            abstract: paper.abstract || "",
-            authors: paper.authors || [],
-            journal: paper.journal,
-            pubDate: paper.pubDate,
-            pmid: paper.pmid,
-            relevanceScore: paper.relevanceScore
-          }))
-        };
-        console.log("📋 Request body:", requestBody);
-        
         const res = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody),
+          body: JSON.stringify({ 
+            question, 
+            results: results.map(paper => ({
+              title: paper.title,
+              abstract: paper.abstract || "",
+              authors: paper.authors || [],
+              journal: paper.journal,
+              pubDate: paper.pubDate,
+              pmid: paper.pmid,
+              relevanceScore: paper.relevanceScore
+            }))
+          }),
         });
-        
-        console.log(`📥 Response status: ${res.status}`);
         
         if (!res.ok) {
           const errorData = await res.json();
-          console.error("❌ Response not OK:", errorData);
-          throw new Error(errorData.error || errorData.detail || `HTTP ${res.status}: Failed to analyze evidence gap`);
+          throw new Error(errorData.error || `Analysis failed (${res.status})`);
         }
         
         const data = await res.json();
-        console.log("📊 Analysis response:", data);
         
-        // Verify the analysis is for the current question
         if (data.clinical_question === question) {
-          console.log("✅ Analysis matches current question, setting analysis");
           setAnalysis(data);
-        } else {
-          console.log("⚠️ Analysis received for different question, discarding");
-          console.log(`Expected: "${question}", Got: "${data.clinical_question}"`);
         }
       } catch (err: unknown) {
-        console.error("❌ Error in analyze:", err);
-        const errorMessage = err instanceof Error ? err.message : "An error occurred during analysis";
-        console.error("❌ Setting analysis error:", errorMessage);
-        setAnalysisError(errorMessage);
+        console.error("Analysis error:", err);
+        setAnalysisError(err instanceof Error ? err.message : "Analysis failed");
       } finally {
-        console.log("🏁 Analysis useEffect complete, setting analyzing to false");
         setAnalyzing(false);
       }
     };
@@ -403,7 +369,7 @@ export default function Home() {
                       <span className="text-lg font-semibold text-blue-800">Analyzing Evidence Intelligence</span>
                     </div>
                     <p className="text-blue-700">Our AI is analyzing the research landscape and identifying key evidence gaps...</p>
-                    <p className="text-blue-600 text-sm mt-2">Analyzing {results.length} papers for "{question}"</p>
+                    <p className="text-blue-600 text-sm mt-2">Analyzing {results.length} papers for &quot;{question}&quot;</p>
                   </div>
                 )}
 
