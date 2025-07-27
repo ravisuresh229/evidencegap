@@ -5,19 +5,5 @@
       "src": "package.json",
       "use": "@vercel/next"
     }
-  ],
-  "routes": [
-    {
-      "src": "/api/scrape",
-      "dest": "/api/scrape.py"
-    },
-    {
-      "src": "/api/analyze", 
-      "dest": "/api/analyze.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1"
-    }
   ]
 } 
