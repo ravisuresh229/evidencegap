@@ -14,7 +14,7 @@ app = FastAPI(title="Evidence Gap Analysis API")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend URL
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,6 +32,10 @@ class AnalyzeRequest(BaseModel):
 
 @app.get("/")
 async def root():
+    return {"message": "Evidence Gap Analysis API"}
+
+@app.get("/api/")
+async def api_root():
     return {"message": "Evidence Gap Analysis API"}
 
 @app.post("/api/scrape")

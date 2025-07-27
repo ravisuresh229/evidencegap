@@ -20,7 +20,9 @@
       "dest": "/frontend/$1"
     }
   ],
-  "env": {
-    "OPENAI_API_KEY": "@openai_api_key"
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.9"
+    }
   }
 } 
