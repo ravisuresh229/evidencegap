@@ -21,6 +21,9 @@ const SYNONYM_MAPPINGS: Record<string, string[]> = {
   'rheumatoid': ['rheumatoid arthritis', 'RA', 'rheumatoid'],
   'statins': ['statins', 'statin', 'HMG-CoA reductase inhibitors'],
   'glp-1': ['glp-1', 'glp1', 'glucagon-like peptide-1', 'glucagon like peptide 1'],
+  'sglt2': ['sglt2', 'sglt-2', 'sglt2 inhibitors', 'sglt-2 inhibitors', 'sodium-glucose cotransporter-2'],
+  'heart': ['heart', 'cardiac', 'cardiovascular', 'cardiology'],
+  'failure': ['failure', 'dysfunction', 'disease'],
   'outcomes': ['outcomes', 'effectiveness', 'efficacy', 'results'],
   'management': ['management', 'treatment', 'therapy', 'intervention'],
   'biomarkers': ['biomarkers', 'biomarker', 'markers', 'marker'],
@@ -67,11 +70,11 @@ const analyzeQuery = (query: string): QueryAnalysis => {
   const lowerQuery = query.toLowerCase();
   
   // Extract medical conditions
-  const conditions = ['diabetes', 'cancer', 'arthritis', 'hypertension', 'copd', 'asthma', 'depression', 'obesity', 'rheumatoid'];
+  const conditions = ['diabetes', 'cancer', 'arthritis', 'hypertension', 'copd', 'asthma', 'depression', 'obesity', 'rheumatoid', 'heart failure', 'cardiac'];
   const medicalCondition = conditions.find(condition => lowerQuery.includes(condition)) || null;
   
   // Extract interventions/treatments
-  const interventions = ['metformin', 'statins', 'biologics', 'telemedicine', 'telehealth', 'surgery', 'therapy', 'glp-1'];
+  const interventions = ['metformin', 'statins', 'biologics', 'telemedicine', 'telehealth', 'surgery', 'therapy', 'glp-1', 'sglt2', 'sglt-2'];
   const intervention = interventions.find(interv => lowerQuery.includes(interv)) || null;
   
   // Split query into important terms (remove common words)
@@ -110,6 +113,11 @@ const validatePaperRelevance = (paper: Paper, queryAnalysis: QueryAnalysis): boo
   if (hasCondition && hasIntervention) return true;
   if (primaryMatches >= 1) return true; // Allow single primary term matches
   
+  // Special case for biomarker searches - be more lenient
+  if (queryAnalysis.primaryTerms.includes('biomarkers') || queryAnalysis.primaryTerms.includes('biomarker')) {
+    if (hasCondition) return true; // If it has cancer/diabetes/etc, include it
+  }
+  
   return false;
 };
 
@@ -135,11 +143,11 @@ const buildPubMedQuery = (userQuery: string): string => {
     queryParts.push(primaryQuery);
   }
   
-  // Add study type filters
-  queryParts.push('(systematic review[pt] OR meta-analysis[pt] OR randomized controlled trial[pt] OR clinical trial[pt])');
+  // Add study type filters (more inclusive)
+  queryParts.push('(systematic review[pt] OR meta-analysis[pt] OR randomized controlled trial[pt] OR clinical trial[pt] OR review[pt] OR observational study[pt])');
   
-  // Add date filter (last 10 years)
-  queryParts.push('(2014:2024[dp])');
+  // Add date filter (last 15 years for broader coverage)
+  queryParts.push('(2009:2024[dp])');
   
   return queryParts.join(' AND ');
 };
@@ -186,14 +194,15 @@ const filterAndScorePapers = (papers: Paper[], queryAnalysis: QueryAnalysis) => 
     validatePaperRelevance(paper, queryAnalysis)
   );
   
-  // Stage 2: Quality filtering (abstracts, recent papers)
+  // Stage 2: Quality filtering (more flexible)
   const qualityPapers = relevantPapers.filter(paper => {
     const hasGoodAbstract = paper.abstract && 
-      paper.abstract.length > 100 && 
+      paper.abstract.length > 50 && 
       !paper.abstract.includes('No abstract available');
-    const isRecent = paper.pubDate && parseInt(paper.pubDate) >= 2019;
+    const isRecent = paper.pubDate && parseInt(paper.pubDate) >= 2015;
+    const hasTitle = paper.title && paper.title.length > 10;
     
-    return hasGoodAbstract || isRecent;
+    return (hasGoodAbstract || isRecent) && hasTitle;
   });
   
   // Stage 3: Scoring and ranking
@@ -211,6 +220,55 @@ const filterAndScorePapers = (papers: Paper[], queryAnalysis: QueryAnalysis) => 
   }
   
   return scoredPapers.sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 15);
+};
+
+// Helper function to generate alternative search suggestions
+const generateSearchSuggestions = (query: string, queryAnalysis: QueryAnalysis): string[] => {
+  const suggestions: string[] = [];
+  
+  // Remove common modifiers
+  const modifiers = ['effectiveness of', 'efficacy of', 'safety of', 'long-term', 'comparative'];
+  let simplifiedQuery = query.toLowerCase();
+  modifiers.forEach(modifier => {
+    simplifiedQuery = simplifiedQuery.replace(modifier, '').trim();
+  });
+  
+  // Add simplified version
+  if (simplifiedQuery !== query.toLowerCase()) {
+    suggestions.push(simplifiedQuery);
+  }
+  
+  // Add broader term combinations
+  if (queryAnalysis.primaryTerms.length >= 2) {
+    const broaderTerms = queryAnalysis.primaryTerms.slice(0, 2).join(' ');
+    suggestions.push(broaderTerms);
+  }
+  
+  // Add synonym-based suggestions
+  if (queryAnalysis.medicalCondition) {
+    const synonyms = SYNONYM_MAPPINGS[queryAnalysis.medicalCondition] || [];
+    if (synonyms.length > 1) {
+      synonyms.slice(1, 3).forEach(synonym => {
+        if (queryAnalysis.primaryTerms.length > 0) {
+          suggestions.push(`${queryAnalysis.primaryTerms[0]} ${synonym}`);
+        }
+      });
+    }
+  }
+  
+  // Add intervention-based suggestions
+  if (queryAnalysis.intervention) {
+    const synonyms = SYNONYM_MAPPINGS[queryAnalysis.intervention] || [];
+    if (synonyms.length > 1) {
+      synonyms.slice(1, 2).forEach(synonym => {
+        if (queryAnalysis.medicalCondition) {
+          suggestions.push(`${synonym} ${queryAnalysis.medicalCondition}`);
+        }
+      });
+    }
+  }
+  
+  return suggestions.slice(0, 3); // Limit to 3 suggestions
 };
 
 const searchPubMedWithFallback = async (query: string) => {
@@ -246,11 +304,50 @@ const searchPubMedWithFallback = async (query: string) => {
       papers = await searchPubMed(noDateQuery);
     }
     
+    if (papers.length === 0) {
+      // Fallback 4: Try simplified query (remove modifiers)
+      const modifiers = ['effectiveness of', 'efficacy of', 'safety of', 'long-term', 'comparative'];
+      let simplifiedQuery = query.toLowerCase();
+      modifiers.forEach(modifier => {
+        simplifiedQuery = simplifiedQuery.replace(modifier, '').trim();
+      });
+      
+      if (simplifiedQuery !== query.toLowerCase()) {
+        const simplifiedAnalysis = analyzeQuery(simplifiedQuery);
+        const simplifiedTerms = simplifiedAnalysis.primaryTerms.map(term => `"${term}"[tw]`).join(' AND ');
+        papers = await searchPubMed(simplifiedTerms);
+      }
+    }
+    
+    if (papers.length === 0) {
+      // Fallback 5: Try broader term combinations
+      if (queryAnalysis.primaryTerms.length >= 2) {
+        const broaderTerms = queryAnalysis.primaryTerms.slice(0, 2).map(term => `"${term}"[tw]`).join(' AND ');
+        papers = await searchPubMed(broaderTerms);
+      }
+    }
+    
+    if (papers.length === 0) {
+      // Fallback 6: For biomarker searches, try broader terms
+      if (queryAnalysis.primaryTerms.includes('biomarkers') || queryAnalysis.primaryTerms.includes('biomarker')) {
+        const biomarkerQuery = `(biomarker OR biomarkers) AND (cancer OR tumor OR neoplasm) AND (detection OR screening OR diagnosis)`;
+        papers = await searchPubMed(biomarkerQuery);
+      }
+    }
+    
     // Filter and score results
+    console.log(`🔍 Found ${papers.length} papers before filtering`);
     const filteredPapers = filterAndScorePapers(papers, queryAnalysis);
+    console.log(`🔍 After filtering: ${filteredPapers.length} papers`);
     
     if (filteredPapers.length === 0) {
-      throw new Error(`No relevant papers found for "${query}". Try broader search terms.`);
+      console.log(`❌ No papers passed relevance filter for "${query}"`);
+      const suggestions = generateSearchSuggestions(query, queryAnalysis);
+      const suggestionText = suggestions.length > 0 
+        ? `\n\nTry these alternative searches:\n${suggestions.map(s => `• "${s}"`).join('\n')}`
+        : '\n\nTry using broader search terms or different keywords.';
+      
+      throw new Error(`No relevant papers found for "${query}".${suggestionText}`);
     }
     
     return filteredPapers;
