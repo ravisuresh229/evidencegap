@@ -55,38 +55,83 @@ const generateProfessionalPDF = (analysis: string, query: string, papers: PubMed
     
     // Header with branding
     doc.setFillColor(37, 99, 235); // Blue background
-    doc.rect(0, 0, 210, 30, 'F');
+    doc.rect(0, 0, 210, 35, 'F');
     
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
-    doc.text('AETHER Evidence Intelligence Platform', 20, 20);
+    doc.setFontSize(20);
+    doc.text('AETHER Evidence Intelligence Platform', 20, 22);
     
     // Reset colors for content
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(14);
-    doc.text('Evidence Gap Analysis Report', 20, 45);
+    doc.setFontSize(16);
+    doc.text('Evidence Gap Analysis Report', 20, 50);
     
-    // Query and metadata
-    doc.setFontSize(10);
-    doc.text(`Clinical Question: ${query}`, 20, 60);
-    doc.text(`Papers Analyzed: ${papers.length}`, 20, 70);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 80);
+    // Query and metadata with better spacing
+    doc.setFontSize(12);
+    doc.text(`Clinical Question: ${query}`, 20, 70);
+    doc.text(`Papers Analyzed: ${papers.length}`, 20, 82);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 94);
     
-    // Analysis content with proper spacing
-    doc.setFontSize(9);
+    // Add a separator line
+    doc.setDrawColor(200, 200, 200);
+    doc.line(20, 105, 190, 105);
     
-    // Clean the analysis text (remove markdown)
-    const cleanAnalysis = analysis
+    // Analysis content with much better spacing
+    doc.setFontSize(11);
+    
+    // Clean the analysis text (remove markdown and improve formatting)
+    let cleanAnalysis = analysis
       .replace(/\*\*/g, '') // Remove bold markers
-      .replace(/##\s*/g, '') // Remove header markers
-      .replace(/\*\s*/g, '• '); // Convert bullets
+      .replace(/##\s*/g, '\n\n') // Convert headers to double line breaks
+      .replace(/\*\s*/g, '• ') // Convert bullets
+      .replace(/\n\n\n/g, '\n\n') // Remove excessive line breaks
+      .replace(/\n\n/g, '\n \n'); // Add space between paragraphs
     
-    const lines = doc.splitTextToSize(cleanAnalysis, 170);
-    doc.text(lines, 20, 95);
+    // Split into sections for better formatting
+    const sections = cleanAnalysis.split('\n\n');
+    let currentY = 120;
     
-    // Footer
-    doc.setFontSize(8);
-    doc.text('© 2025 AETHER Evidence Intelligence Platform', 20, 280);
+    sections.forEach((section, index) => {
+      if (section.trim().length === 0) return;
+      
+      // Check if this is a header (all caps or short text)
+      const isHeader = section.length < 50 || section === section.toUpperCase();
+      
+             if (isHeader) {
+         // Format headers
+         doc.setFontSize(14);
+         doc.setFont('helvetica', 'bold');
+         doc.text(section.trim(), 20, currentY);
+         currentY += 12;
+         doc.setFont('helvetica', 'normal');
+         doc.setFontSize(11);
+       } else {
+        // Format regular content with proper line wrapping
+        const lines = doc.splitTextToSize(section.trim(), 160);
+        
+        // Check if we need a new page
+        if (currentY + (lines.length * 6) > 270) {
+          doc.addPage();
+          currentY = 20;
+        }
+        
+        doc.text(lines, 20, currentY);
+        currentY += (lines.length * 6) + 4; // 6pt line height + 4pt spacing
+      }
+      
+      // Add extra spacing between sections
+      currentY += 8;
+    });
+    
+    // Footer on each page
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text('© 2025 AETHER Evidence Intelligence Platform', 20, 285);
+      doc.text(`Page ${i} of ${pageCount}`, 170, 285);
+    }
     
     // Save with clean filename
     const cleanQuery = query.substring(0, 40).replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
