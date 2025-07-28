@@ -91,7 +91,7 @@ const analyzeQuery = (query: string): QueryAnalysis => {
   };
 };
 
-const validatePaperRelevance = (paper: Paper, _queryAnalysis: QueryAnalysis): boolean => {
+const validatePaperRelevance = (paper: Paper): boolean => {
   const title = paper.title?.toLowerCase() || '';
   const abstract = paper.abstract?.toLowerCase() || '';
   const fullText = `${title} ${abstract}`;
@@ -290,7 +290,7 @@ const calculateRelevanceScore = (paper: Paper, queryAnalysis: QueryAnalysis): nu
 const filterAndScorePapers = (papers: Paper[], queryAnalysis: QueryAnalysis) => {
   // Stage 1: Relevance filtering
   const relevantPapers = papers.filter(paper => 
-    validatePaperRelevance(paper, queryAnalysis)
+    validatePaperRelevance(paper)
   );
   
   // Stage 2: Quality filtering (more flexible)
@@ -416,10 +416,10 @@ const searchWithIntelligentFallbacks = async (originalQuery: string) => {
           break;
         }
       }
+      }
     }
-  }
-  
-  // Filter and score results
+    
+    // Filter and score results
   const queryAnalysis = analyzeQuery(queryUsed);
   const filteredPapers = filterAndScorePapers(results, queryAnalysis);
   

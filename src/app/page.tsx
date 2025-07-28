@@ -80,7 +80,7 @@ const generateProfessionalPDF = (analysis: string, query: string, papers: PubMed
     doc.setFontSize(11);
     
     // Clean the analysis text (remove markdown and improve formatting)
-    let cleanAnalysis = analysis
+    const cleanAnalysis = analysis
       .replace(/\*\*/g, '') // Remove bold markers
       .replace(/##\s*/g, '\n\n') // Convert headers to double line breaks
       .replace(/\*\s*/g, '• ') // Convert bullets
@@ -91,7 +91,7 @@ const generateProfessionalPDF = (analysis: string, query: string, papers: PubMed
     const sections = cleanAnalysis.split('\n\n');
     let currentY = 120;
     
-    sections.forEach((section, index) => {
+    sections.forEach((section) => {
       if (section.trim().length === 0) return;
       
       // Check if this is a header (all caps or short text)
