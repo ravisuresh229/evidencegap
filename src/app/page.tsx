@@ -489,9 +489,24 @@ export default function Home() {
                           </span>
                         )}
                         {paper.relevanceScore && (
-                          <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
-                            Score: {paper.relevanceScore}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
+                              Score: {paper.relevanceScore}
+                            </span>
+                            <div className="relative group">
+                              <svg 
+                                className="w-4 h-4 text-gray-400 cursor-help" 
+                                fill="currentColor" 
+                                viewBox="0 0 24 24"
+                              >
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                              </svg>
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                                Relevance score based on title/abstract match, study type, journal quality, and recency
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                              </div>
+                            </div>
+                          </div>
                         )}
                       </div>
                       
@@ -671,6 +686,42 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      {/* How it Works Section */}
+      <div className="bg-gray-50 py-8 mt-12">
+        <div className="max-w-4xl mx-auto px-4">
+          <h3 className="text-lg font-semibold mb-4 text-center text-gray-900">How AETHER Works</h3>
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+              </div>
+              <h4 className="font-medium mb-2 text-gray-900">1. Intelligent Search</h4>
+              <p className="text-sm text-gray-600">AI-powered PubMed search with medical term expansion and relevance scoring</p>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <h4 className="font-medium mb-2 text-gray-900">2. Evidence Analysis</h4>
+              <p className="text-sm text-gray-600">Real-world evidence gaps identified using federated data network thinking</p>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+              </div>
+              <h4 className="font-medium mb-2 text-gray-900">3. Strategic Insights</h4>
+              <p className="text-sm text-gray-600">Actionable recommendations for research opportunities and clinical integration</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Footer */}
       <footer className="py-12 px-4 bg-gray-900 text-gray-400">
