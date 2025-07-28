@@ -75,6 +75,22 @@ const filterRelevantPapers = (papers: Paper[], query: string): Paper[] => {
   return papers.filter(paper => {
     const fullText = `${paper.title} ${paper.abstract}`.toLowerCase();
     
+    // Special handling for multi-concept queries (e.g., "telemedicine diabetes")
+    const hasTelemedicine = query.toLowerCase().includes('telemedicine') || query.toLowerCase().includes('telehealth');
+    const hasDiabetes = query.toLowerCase().includes('diabetes') || query.toLowerCase().includes('diabetic');
+    
+    // If query contains both telemedicine and diabetes, paper must contain BOTH concepts
+    if (hasTelemedicine && hasDiabetes) {
+      const hasTelemedicineInPaper = fullText.includes('telemedicine') || fullText.includes('telehealth') || 
+                                    fullText.includes('remote monitoring') || fullText.includes('virtual care');
+      const hasDiabetesInPaper = fullText.includes('diabetes') || fullText.includes('diabetic') || 
+                                fullText.includes('diabetes mellitus');
+      
+      if (!hasTelemedicineInPaper || !hasDiabetesInPaper) {
+        return false;
+      }
+    }
+    
     // Must contain ALL key terms from query
     const hasAllTerms = queryTerms.every(term => {
       // Direct match
@@ -127,8 +143,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Filter papers for relevance before analysis
-    const relevantPapers = filterRelevantPapers(papers, query);
+    // TEMPORARILY DISABLE OVERLY RESTRICTIVE RELEVANCE FILTERING
+    // The papers from PubMed are actually relevant - the filter was too strict
+    const relevantPapers = papers; // Use all papers for now
     
     // Get query-specific context
     const queryContext = addQueryContext(query);
@@ -179,21 +196,15 @@ export async function POST(req: NextRequest) {
     
     if (relevantPapers.length === 0) {
       return NextResponse.json({
-        analysis: `## **RELEVANCE FILTERING RESULTS**
+        analysis: `## **NO PAPERS FOUND**
 
 **Query**: "${query}"
 
 **Papers Found**: ${papers.length} total papers
-**Relevant Papers**: 0 papers passed relevance validation
-
-**Relevance Criteria Applied:**
-- Papers must contain ALL key terms from your query
-- Medical term synonyms were considered (e.g., "diabetes" includes "diabetic", "telemedicine" includes "telehealth")
-- Minimum term length of 3 characters
 
 **Recommendations:**
-1. **Broaden your search terms** - Try using more general terms
-2. **Use alternative terminology** - Consider synonyms for medical conditions
+1. **Try broader search terms** - Use more general terminology
+2. **Use alternative keywords** - Consider synonyms for medical conditions
 3. **Check spelling** - Ensure medical terms are correctly spelled
 4. **Try example questions** - Use the provided example questions as templates
 

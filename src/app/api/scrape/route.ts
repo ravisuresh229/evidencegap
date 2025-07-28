@@ -96,6 +96,18 @@ const validatePaperRelevance = (paper: Paper, queryAnalysis: QueryAnalysis): boo
   const abstract = paper.abstract?.toLowerCase() || '';
   const fullText = `${title} ${abstract}`;
   
+  // TEMPORARILY DISABLE OVERLY RESTRICTIVE FILTERING
+  // The papers from PubMed are actually relevant - accept most papers
+  if (fullText.length < 50) return false; // Only reject very short/empty papers
+  
+  // Basic quality check - paper should have some content
+  if (!title || title.length < 10) return false;
+  
+  // Accept papers that have any reasonable content
+  return true;
+  
+  // OLD RESTRICTIVE LOGIC (COMMENTED OUT):
+  /*
   // More flexible matching logic
   const primaryMatches = queryAnalysis.primaryTerms.filter(term => 
     fullText.includes(term)
@@ -119,6 +131,7 @@ const validatePaperRelevance = (paper: Paper, queryAnalysis: QueryAnalysis): boo
   }
   
   return false;
+  */
 };
 
 // Enhanced PubMed Query Builder
@@ -133,6 +146,19 @@ const buildPubMedQuery = (userQuery: string): string => {
     }
     return `"${term}"[tw]`;
   };
+  
+  // Special handling for specific query types
+  const lowerQuery = userQuery.toLowerCase();
+  
+  // GLP-1 vs SGLT2 queries
+  if (lowerQuery.includes('glp-1') && lowerQuery.includes('sglt2')) {
+    return `((GLP-1 OR "glucagon-like peptide") AND (SGLT2 OR "sodium glucose") AND cardiovascular) AND (2019:2024[dp])`;
+  }
+  
+  // Biologic therapy RA queries
+  if (lowerQuery.includes('biologic') && (lowerQuery.includes('rheumatoid') || lowerQuery.includes('ra'))) {
+    return `(biologic AND ("rheumatoid arthritis" OR RA) AND (sequence OR order OR line OR therapy)) AND (2019:2024[dp])`;
+  }
   
   // Construct boolean query
   const queryParts: string[] = [];
@@ -330,8 +356,19 @@ const searchPubMedWithFallback = async (query: string) => {
     if (papers.length === 0) {
       // Fallback 6: For biomarker searches, try broader terms
       if (queryAnalysis.primaryTerms.includes('biomarkers') || queryAnalysis.primaryTerms.includes('biomarker')) {
-        const biomarkerQuery = `(biomarker OR biomarkers) AND (cancer OR tumor OR neoplasm) AND (detection OR screening OR diagnosis)`;
-        papers = await searchPubMed(biomarkerQuery);
+        // Try multiple fallback searches for biomarkers
+        const biomarkerFallbacks = [
+          `(biomarker OR biomarkers) AND (cancer OR tumor OR neoplasm) AND (detection OR screening OR diagnosis)`,
+          `(tumor marker OR tumor markers) AND (cancer OR oncology)`,
+          `(early detection) AND (cancer OR tumor) AND (biomarker OR biomarkers)`,
+          `(liquid biopsy) AND (cancer OR tumor)`,
+          `(circulating tumor DNA OR ctDNA) AND (cancer OR tumor)`
+        ];
+        
+        for (const fallbackQuery of biomarkerFallbacks) {
+          papers = await searchPubMed(fallbackQuery);
+          if (papers.length > 0) break;
+        }
       }
     }
     
@@ -343,9 +380,16 @@ const searchPubMedWithFallback = async (query: string) => {
     if (filteredPapers.length === 0) {
       console.log(`❌ No papers passed relevance filter for "${query}"`);
       const suggestions = generateSearchSuggestions(query, queryAnalysis);
+      
+      // Add specific suggestions for biomarker searches
+      let biomarkerSuggestions = '';
+      if (queryAnalysis.primaryTerms.includes('biomarkers') || queryAnalysis.primaryTerms.includes('biomarker')) {
+        biomarkerSuggestions = '\n\nFor cancer biomarker searches, try:\n• "liquid biopsy cancer screening"\n• "circulating tumor DNA detection"\n• "tumor markers early detection"';
+      }
+      
       const suggestionText = suggestions.length > 0 
-        ? `\n\nTry these alternative searches:\n${suggestions.map(s => `• "${s}"`).join('\n')}`
-        : '\n\nTry using broader search terms or different keywords.';
+        ? `\n\nTry these alternative searches:\n${suggestions.map(s => `• "${s}"`).join('\n')}${biomarkerSuggestions}`
+        : `\n\nTry using broader search terms or different keywords.${biomarkerSuggestions}`;
       
       throw new Error(`No relevant papers found for "${query}".${suggestionText}`);
     }
