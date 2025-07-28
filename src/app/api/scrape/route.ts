@@ -134,6 +134,71 @@ const validatePaperRelevance = (paper: Paper, queryAnalysis: QueryAnalysis): boo
   */
 };
 
+// Intelligent Query Analysis and Fallback System
+const analyzeAndExpandQuery = (originalQuery: string): string[] => {
+  const words = originalQuery.toLowerCase().split(' ').filter(word => word.length > 2);
+  
+  // Medical term expansion dictionary
+  const medicalExpansions: { [key: string]: string[] } = {
+    // Conditions
+    'diabetes': ['diabetes', 'diabetic', 'diabetes mellitus', 'hyperglycemia'],
+    'cancer': ['cancer', 'tumor', 'neoplasm', 'malignancy', 'oncology'],
+    'arthritis': ['arthritis', 'rheumatoid arthritis', 'RA', 'joint inflammation'],
+    'heart': ['heart', 'cardiac', 'cardiovascular', 'coronary'],
+    'kidney': ['kidney', 'renal', 'nephrology'],
+    
+    // Treatments
+    'biomarkers': ['biomarkers', 'tumor markers', 'diagnostic markers', 'prognostic markers'],
+    'biologics': ['biologics', 'biologic therapy', 'monoclonal antibodies', 'targeted therapy'],
+    'telemedicine': ['telemedicine', 'telehealth', 'remote monitoring', 'virtual care'],
+    
+    // Qualifiers
+    'novel': ['novel', 'new', 'emerging', 'innovative'],
+    'early': ['early', 'screening', 'detection', 'diagnosis'],
+    'effectiveness': ['effectiveness', 'efficacy', 'outcomes', 'results'],
+    'safety': ['safety', 'adverse events', 'side effects', 'toxicity']
+  };
+  
+  // Generate progressive fallback queries
+  const fallbackStrategies: string[] = [];
+  
+  // Strategy 1: Remove vague qualifiers
+  const vagueWords = ['novel', 'new', 'emerging', 'optimal', 'best', 'improved'];
+  const withoutVague = words.filter(word => !vagueWords.includes(word));
+  if (withoutVague.length < words.length) {
+    fallbackStrategies.push(withoutVague.join(' '));
+  }
+  
+  // Strategy 2: Expand medical terms with synonyms
+  const expandedTerms = words.map(word => {
+    return medicalExpansions[word] ? medicalExpansions[word][0] : word;
+  });
+  fallbackStrategies.push(expandedTerms.join(' '));
+  
+  // Strategy 3: Use only core medical terms (remove connecting words)
+  const connectingWords = ['for', 'in', 'of', 'and', 'or', 'the', 'with', 'versus', 'vs'];
+  const coreTerms = words.filter(word => !connectingWords.includes(word));
+  if (coreTerms.length >= 2) {
+    fallbackStrategies.push(coreTerms.slice(0, 3).join(' '));
+  }
+  
+  // Strategy 4: Try individual key terms if query has multiple concepts
+  if (words.length > 3) {
+    // Find the most important medical terms
+    const importantTerms = words.filter(word => 
+      medicalExpansions[word] || 
+      word.length > 6 || 
+      ['diabetes', 'cancer', 'arthritis', 'heart', 'kidney'].some(term => word.includes(term))
+    );
+    
+    if (importantTerms.length > 0) {
+      fallbackStrategies.push(importantTerms[0]);
+    }
+  }
+  
+  return fallbackStrategies.filter(strategy => strategy && strategy.length > 0);
+};
+
 // Enhanced PubMed Query Builder
 const buildPubMedQuery = (userQuery: string): string => {
   const analysis = analyzeQuery(userQuery);
@@ -248,159 +313,114 @@ const filterAndScorePapers = (papers: Paper[], queryAnalysis: QueryAnalysis) => 
   return scoredPapers.sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 15);
 };
 
-// Helper function to generate alternative search suggestions
-const generateSearchSuggestions = (query: string, queryAnalysis: QueryAnalysis): string[] => {
+// Smart error messaging with suggestions
+const generateSearchSuggestions = (originalQuery: string): string[] => {
+  const words = originalQuery.toLowerCase().split(' ');
   const suggestions: string[] = [];
   
-  // Remove common modifiers
-  const modifiers = ['effectiveness of', 'efficacy of', 'safety of', 'long-term', 'comparative'];
-  let simplifiedQuery = query.toLowerCase();
-  modifiers.forEach(modifier => {
-    simplifiedQuery = simplifiedQuery.replace(modifier, '').trim();
-  });
-  
-  // Add simplified version
-  if (simplifiedQuery !== query.toLowerCase()) {
-    suggestions.push(simplifiedQuery);
+  // Suggest removing vague terms
+  if (words.some(word => ['novel', 'new', 'optimal', 'best'].includes(word))) {
+    const simplified = words.filter(word => !['novel', 'new', 'optimal', 'best'].includes(word));
+    suggestions.push(simplified.join(' '));
   }
   
-  // Add broader term combinations
-  if (queryAnalysis.primaryTerms.length >= 2) {
-    const broaderTerms = queryAnalysis.primaryTerms.slice(0, 2).join(' ');
-    suggestions.push(broaderTerms);
+  // Suggest more specific medical terms
+  if (words.includes('biomarkers')) {
+    suggestions.push('liquid biopsy cancer screening');
+    suggestions.push('tumor markers diagnosis');
   }
   
-  // Add synonym-based suggestions
-  if (queryAnalysis.medicalCondition) {
-    const synonyms = SYNONYM_MAPPINGS[queryAnalysis.medicalCondition] || [];
-    if (synonyms.length > 1) {
-      synonyms.slice(1, 3).forEach(synonym => {
-        if (queryAnalysis.primaryTerms.length > 0) {
-          suggestions.push(`${queryAnalysis.primaryTerms[0]} ${synonym}`);
-        }
-      });
-    }
+  if (words.includes('treatment') || words.includes('therapy')) {
+    suggestions.push(words.join(' ').replace(/treatment|therapy/, 'medication'));
   }
   
-  // Add intervention-based suggestions
-  if (queryAnalysis.intervention) {
-    const synonyms = SYNONYM_MAPPINGS[queryAnalysis.intervention] || [];
-    if (synonyms.length > 1) {
-      synonyms.slice(1, 2).forEach(synonym => {
-        if (queryAnalysis.medicalCondition) {
-          suggestions.push(`${synonym} ${queryAnalysis.medicalCondition}`);
-        }
-      });
-    }
+  // Add condition-specific alternatives
+  if (words.includes('cancer')) {
+    suggestions.push('oncology clinical outcomes');
+    suggestions.push('tumor therapy effectiveness');
   }
   
-  return suggestions.slice(0, 3); // Limit to 3 suggestions
+  if (words.includes('diabetes')) {
+    suggestions.push('diabetic medication effectiveness');
+    suggestions.push('glycemic control outcomes');
+  }
+  
+  if (words.includes('arthritis') || words.includes('ra')) {
+    suggestions.push('rheumatoid arthritis treatment');
+    suggestions.push('joint inflammation therapy');
+  }
+  
+  return suggestions.slice(0, 3); // Return top 3 suggestions
 };
 
-const searchPubMedWithFallback = async (query: string) => {
-  const queryAnalysis = analyzeQuery(query);
-  console.log(`🔍 Query analysis for "${query}":`, {
-    primaryTerms: queryAnalysis.primaryTerms,
-    secondaryTerms: queryAnalysis.secondaryTerms,
-    medicalCondition: queryAnalysis.medicalCondition,
-    intervention: queryAnalysis.intervention
-  });
+const handleSearchFailure = (originalQuery: string) => {
+  const suggestions = generateSearchSuggestions(originalQuery);
   
-  try {
-    // Primary search
-    const pubmedQuery = buildPubMedQuery(query);
-    console.log(`🔍 PubMed query: "${pubmedQuery}"`);
-    let papers = await searchPubMed(pubmedQuery);
+  return {
+    error: `No relevant papers found for "${originalQuery}".`,
+    suggestions: suggestions,
+    message: suggestions.length > 0 
+      ? `Try these alternative searches: ${suggestions.map(s => `"${s}"`).join(', ')}`
+      : 'Try using more specific medical terms or broader search criteria.'
+  };
+};
+
+const searchWithIntelligentFallbacks = async (originalQuery: string) => {
+  console.log(`🔍 Starting intelligent search for: "${originalQuery}"`);
+  
+  // Try original query first
+  let results = await searchPubMed(buildPubMedQuery(originalQuery));
+  let queryUsed = originalQuery;
+  let fallbackUsed = false;
+  
+  if (results.length === 0) {
+    console.log('Original query returned 0 results, trying intelligent fallbacks...');
     
-    if (papers.length === 0) {
-      // Fallback 1: Broader search without study type filters
-      const broadQuery = queryAnalysis.primaryTerms.map(term => `"${term}"[tw]`).join(' AND ');
-      papers = await searchPubMed(broadQuery + ' AND (2019:2024[dp])');
-    }
+    const fallbackQueries = analyzeAndExpandQuery(originalQuery);
     
-    if (papers.length === 0) {
-      // Fallback 2: Individual term search with broader date range
-      const singleTermQuery = `"${queryAnalysis.primaryTerms[0]}"[tw] AND (2015:2024[dp])`;
-      papers = await searchPubMed(singleTermQuery);
-    }
-    
-    if (papers.length === 0) {
-      // Fallback 3: Search without date restrictions
-      const noDateQuery = queryAnalysis.primaryTerms.map(term => `"${term}"[tw]`).join(' AND ');
-      papers = await searchPubMed(noDateQuery);
-    }
-    
-    if (papers.length === 0) {
-      // Fallback 4: Try simplified query (remove modifiers)
-      const modifiers = ['effectiveness of', 'efficacy of', 'safety of', 'long-term', 'comparative'];
-      let simplifiedQuery = query.toLowerCase();
-      modifiers.forEach(modifier => {
-        simplifiedQuery = simplifiedQuery.replace(modifier, '').trim();
-      });
+    for (const fallbackQuery of fallbackQueries) {
+      console.log(`🔍 Trying fallback: "${fallbackQuery}"`);
+      results = await searchPubMed(buildPubMedQuery(fallbackQuery));
       
-      if (simplifiedQuery !== query.toLowerCase()) {
-        const simplifiedAnalysis = analyzeQuery(simplifiedQuery);
-        const simplifiedTerms = simplifiedAnalysis.primaryTerms.map(term => `"${term}"[tw]`).join(' AND ');
-        papers = await searchPubMed(simplifiedTerms);
+      if (results.length > 0) {
+        queryUsed = fallbackQuery;
+        fallbackUsed = true;
+        console.log(`✅ Success with fallback: "${fallbackQuery}" - found ${results.length} papers`);
+        break;
       }
     }
+  }
+  
+  // If still no results, try very broad searches
+  if (results.length === 0) {
+    console.log('Trying very broad searches...');
+    const words = originalQuery.toLowerCase().split(' ');
+    const broadTerms = ['medicine', 'treatment', 'therapy', 'clinical', 'patient'];
     
-    if (papers.length === 0) {
-      // Fallback 5: Try broader term combinations
-      if (queryAnalysis.primaryTerms.length >= 2) {
-        const broaderTerms = queryAnalysis.primaryTerms.slice(0, 2).map(term => `"${term}"[tw]`).join(' AND ');
-        papers = await searchPubMed(broaderTerms);
-      }
-    }
-    
-    if (papers.length === 0) {
-      // Fallback 6: For biomarker searches, try broader terms
-      if (queryAnalysis.primaryTerms.includes('biomarkers') || queryAnalysis.primaryTerms.includes('biomarker')) {
-        // Try multiple fallback searches for biomarkers
-        const biomarkerFallbacks = [
-          `(biomarker OR biomarkers) AND (cancer OR tumor OR neoplasm) AND (detection OR screening OR diagnosis)`,
-          `(tumor marker OR tumor markers) AND (cancer OR oncology)`,
-          `(early detection) AND (cancer OR tumor) AND (biomarker OR biomarkers)`,
-          `(liquid biopsy) AND (cancer OR tumor)`,
-          `(circulating tumor DNA OR ctDNA) AND (cancer OR tumor)`
-        ];
-        
-        for (const fallbackQuery of biomarkerFallbacks) {
-          papers = await searchPubMed(fallbackQuery);
-          if (papers.length > 0) break;
+    for (const word of words) {
+      if (word.length > 5) {
+        console.log(`🔍 Trying very broad search: "${word}"`);
+        results = await searchPubMed(`"${word}"[tw] AND (2019:2024[dp])`);
+        if (results.length > 0) {
+          queryUsed = word;
+          fallbackUsed = true;
+          console.log(`✅ Success with broad search: "${word}" - found ${results.length} papers`);
+          break;
         }
       }
     }
-    
-    // Filter and score results
-    console.log(`🔍 Found ${papers.length} papers before filtering`);
-    const filteredPapers = filterAndScorePapers(papers, queryAnalysis);
-    console.log(`🔍 After filtering: ${filteredPapers.length} papers`);
-    
-    if (filteredPapers.length === 0) {
-      console.log(`❌ No papers passed relevance filter for "${query}"`);
-      const suggestions = generateSearchSuggestions(query, queryAnalysis);
-      
-      // Add specific suggestions for biomarker searches
-      let biomarkerSuggestions = '';
-      if (queryAnalysis.primaryTerms.includes('biomarkers') || queryAnalysis.primaryTerms.includes('biomarker')) {
-        biomarkerSuggestions = '\n\nFor cancer biomarker searches, try:\n• "liquid biopsy cancer screening"\n• "circulating tumor DNA detection"\n• "tumor markers early detection"';
-      }
-      
-      const suggestionText = suggestions.length > 0 
-        ? `\n\nTry these alternative searches:\n${suggestions.map(s => `• "${s}"`).join('\n')}${biomarkerSuggestions}`
-        : `\n\nTry using broader search terms or different keywords.${biomarkerSuggestions}`;
-      
-      throw new Error(`No relevant papers found for "${query}".${suggestionText}`);
-    }
-    
-    return filteredPapers;
-    
-  } catch (error) {
-    console.error('Search error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    throw new Error(`Search failed: ${errorMessage}`);
   }
+  
+  // Filter and score results
+  const queryAnalysis = analyzeQuery(queryUsed);
+  const filteredPapers = filterAndScorePapers(results, queryAnalysis);
+  
+  return {
+    papers: filteredPapers,
+    queryUsed: queryUsed,
+    fallbackUsed: fallbackUsed,
+    originalQuery: originalQuery
+  };
 };
 
 async function searchPubMed(query: string) {
@@ -507,32 +527,46 @@ async function searchPubMed(query: string) {
   return papers;
 }
 
-async function scrapePubMed(query: string, maxResults: number = 20) {
+async function scrapePubMedWithIntelligentFallbacks(query: string, maxResults: number = 20) {
   try {
-    console.log(`🔬 Starting PubMed scrape for query: "${query}"`);
+    console.log(`🔬 Starting intelligent PubMed scrape for query: "${query}"`);
     
-    const papers = await searchPubMedWithFallback(query);
+    const searchResult = await searchWithIntelligentFallbacks(query);
+    
+    if (searchResult.papers.length === 0) {
+      const errorInfo = handleSearchFailure(query);
+      return { 
+        error: errorInfo.error,
+        suggestions: errorInfo.suggestions,
+        message: errorInfo.message,
+        papers: [],
+        totalFound: 0,
+        totalSearched: 0,
+        query: query,
+        fallbackUsed: false
+      };
+    }
     
     // Progressive filtering strategy
-    let papersWithAbstracts = papers.filter(paper => hasQualityAbstract(paper.abstract, 'high'));
-    console.log(`High quality papers: ${papersWithAbstracts.length}/${papers.length}`);
+    let papersWithAbstracts = searchResult.papers.filter((paper: Paper) => hasQualityAbstract(paper.abstract, 'high'));
+    console.log(`High quality papers: ${papersWithAbstracts.length}/${searchResult.papers.length}`);
     
     // If not enough high quality papers, try medium quality
     if (papersWithAbstracts.length < 5) {
       console.log("Not enough high quality papers, trying medium quality...");
-      papersWithAbstracts = papers.filter(paper => hasQualityAbstract(paper.abstract, 'medium'));
-      console.log(`Medium quality papers: ${papersWithAbstracts.length}/${papers.length}`);
+      papersWithAbstracts = searchResult.papers.filter((paper: Paper) => hasQualityAbstract(paper.abstract, 'medium'));
+      console.log(`Medium quality papers: ${papersWithAbstracts.length}/${searchResult.papers.length}`);
     }
     
     // If still not enough, try low quality
     if (papersWithAbstracts.length < 3) {
       console.log("Not enough medium quality papers, trying low quality...");
-      papersWithAbstracts = papers.filter(paper => hasQualityAbstract(paper.abstract, 'low'));
-      console.log(`Low quality papers: ${papersWithAbstracts.length}/${papers.length}`);
+      papersWithAbstracts = searchResult.papers.filter((paper: Paper) => hasQualityAbstract(paper.abstract, 'low'));
+      console.log(`Low quality papers: ${papersWithAbstracts.length}/${searchResult.papers.length}`);
     }
     
     // Sort papers by relevance score (highest first)
-    papersWithAbstracts.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    papersWithAbstracts.sort((a: Paper, b: Paper) => b.relevanceScore - a.relevanceScore);
     
     // Return top results (ensure minimum 3-5 papers if they exist)
     const minResults = Math.min(3, papersWithAbstracts.length);
@@ -545,12 +579,14 @@ async function scrapePubMed(query: string, maxResults: number = 20) {
     return { 
       papers: topPapers,
       totalFound: papersWithAbstracts.length,
-      totalSearched: papers.length,
-      query: query
+      totalSearched: searchResult.papers.length,
+      query: query,
+      fallbackUsed: searchResult.fallbackUsed,
+      queryUsed: searchResult.queryUsed
     };
     
   } catch (error) {
-    console.error("Error in scrapePubMed:", error);
+    console.error("Error in scrapePubMedWithIntelligentFallbacks:", error);
     return { error: String(error) };
   }
 }
@@ -575,7 +611,7 @@ export async function POST(request: NextRequest) {
     }
     
     console.log("🚀 Starting PubMed scrape...");
-    const result = await scrapePubMed(query, maxResults);
+    const result = await scrapePubMedWithIntelligentFallbacks(query, maxResults);
     
     if (result.error) {
       console.error("❌ Scrape failed:", result.error);

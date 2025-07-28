@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import jsPDF from 'jspdf';
 
 interface PubMedResult {
   title: string;
@@ -45,6 +46,57 @@ const parseMarkdown = (text: string): string => {
     // Convert line breaks
     .replace(/\n\n/g, '<br><br>')
     .replace(/\n/g, '<br>');
+};
+
+// Professional PDF generation function
+const generateProfessionalPDF = (analysis: string, query: string, papers: PubMedResult[]) => {
+  try {
+    const doc = new jsPDF();
+    
+    // Header with branding
+    doc.setFillColor(37, 99, 235); // Blue background
+    doc.rect(0, 0, 210, 30, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.text('AETHER Evidence Intelligence Platform', 20, 20);
+    
+    // Reset colors for content
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
+    doc.text('Evidence Gap Analysis Report', 20, 45);
+    
+    // Query and metadata
+    doc.setFontSize(10);
+    doc.text(`Clinical Question: ${query}`, 20, 60);
+    doc.text(`Papers Analyzed: ${papers.length}`, 20, 70);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 80);
+    
+    // Analysis content with proper spacing
+    doc.setFontSize(9);
+    
+    // Clean the analysis text (remove markdown)
+    let cleanAnalysis = analysis
+      .replace(/\*\*/g, '') // Remove bold markers
+      .replace(/##\s*/g, '') // Remove header markers
+      .replace(/\*\s*/g, '• '); // Convert bullets
+    
+    const lines = doc.splitTextToSize(cleanAnalysis, 170);
+    doc.text(lines, 20, 95);
+    
+    // Footer
+    doc.setFontSize(8);
+    doc.text('© 2025 AETHER Evidence Intelligence Platform', 20, 280);
+    
+    // Save with clean filename
+    const cleanQuery = query.substring(0, 40).replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+    doc.save(`AETHER_${cleanQuery}_${Date.now()}.pdf`);
+    
+    return true;
+  } catch (error) {
+    console.error('PDF generation failed:', error);
+    return false;
+  }
 };
 
 export default function Home() {
@@ -430,42 +482,20 @@ export default function Home() {
                         setExportMessage(null);
                         
                         try {
-                          // Clean the analysis text for export
-                          const cleanAnalysis = analysis.analysis
-                            .replace(/\*\*/g, '') // Remove bold markers
-                            .replace(/^## /gm, '') // Remove header markers
-                            .replace(/^- \*\*(.*?)\*\*: /gm, '- $1: ') // Clean bullet points
-                            .replace(/^\d+\. \*\*(.*?)\*\*: /gm, '$1. $1: '); // Clean numbered lists
+                          // Generate professional PDF
+                          const success = generateProfessionalPDF(
+                            analysis.analysis, 
+                            question, 
+                            results
+                          );
                           
-                          // Create PDF content
-                          const pdfContent = `
-AETHER Evidence Intelligence Analysis
-=====================================
-
-Clinical Question: ${question}
-Papers Analyzed: ${analysis.papers_analyzed}
-Generated on: ${new Date().toLocaleDateString()}
-
-${cleanAnalysis}
-
----
-AETHER Evidence Intelligence Platform
-Accelerating evidence discovery with AI
-                          `;
-                          
-                          // Create blob and download
-                          const blob = new Blob([pdfContent], { type: 'text/plain' });
-                          const url = window.URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `aether-evidence-analysis-${Date.now()}.txt`;
-                          document.body.appendChild(a);
-                          a.click();
-                          document.body.removeChild(a);
-                          window.URL.revokeObjectURL(url);
-                          
-                          setExportMessage('Analysis exported successfully!');
-                          setTimeout(() => setExportMessage(null), 3000);
+                          if (success) {
+                            setExportMessage('PDF exported successfully!');
+                            setTimeout(() => setExportMessage(null), 3000);
+                          } else {
+                            setExportMessage('PDF generation failed. Please try again.');
+                            setTimeout(() => setExportMessage(null), 5000);
+                          }
                         } catch (error) {
                           console.error('Export error:', error);
                           setExportMessage('Export temporarily unavailable. Please try again later.');
@@ -490,7 +520,7 @@ Accelerating evidence discovery with AI
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                           </svg>
-                          Export Analysis
+                          Export PDF
                         </>
                       )}
                     </button>
