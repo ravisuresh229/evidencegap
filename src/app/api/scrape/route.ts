@@ -91,7 +91,7 @@ const analyzeQuery = (query: string): QueryAnalysis => {
   };
 };
 
-const validatePaperRelevance = (paper: Paper, queryAnalysis: QueryAnalysis): boolean => {
+const validatePaperRelevance = (paper: Paper, _queryAnalysis: QueryAnalysis): boolean => {
   const title = paper.title?.toLowerCase() || '';
   const abstract = paper.abstract?.toLowerCase() || '';
   const fullText = `${title} ${abstract}`;
@@ -395,7 +395,7 @@ const searchWithIntelligentFallbacks = async (originalQuery: string) => {
   if (results.length === 0) {
     console.log('Trying very broad searches...');
     const words = originalQuery.toLowerCase().split(' ');
-    const broadTerms = ['medicine', 'treatment', 'therapy', 'clinical', 'patient'];
+    // const broadTerms = ['medicine', 'treatment', 'therapy', 'clinical', 'patient'];
     
     for (const word of words) {
       if (word.length > 5) {

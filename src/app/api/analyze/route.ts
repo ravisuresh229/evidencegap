@@ -68,59 +68,11 @@ const addQueryContext = (query: string) => {
   return Object.keys(contexts).find(key => queryLower.includes(key));
 };
 
-// Relevance validation function
-const filterRelevantPapers = (papers: Paper[], query: string): Paper[] => {
-  const queryTerms = query.toLowerCase().split(' ').filter(term => term.length > 2);
-  
-  return papers.filter(paper => {
-    const fullText = `${paper.title} ${paper.abstract}`.toLowerCase();
-    
-    // Special handling for multi-concept queries (e.g., "telemedicine diabetes")
-    const hasTelemedicine = query.toLowerCase().includes('telemedicine') || query.toLowerCase().includes('telehealth');
-    const hasDiabetes = query.toLowerCase().includes('diabetes') || query.toLowerCase().includes('diabetic');
-    
-    // If query contains both telemedicine and diabetes, paper must contain BOTH concepts
-    if (hasTelemedicine && hasDiabetes) {
-      const hasTelemedicineInPaper = fullText.includes('telemedicine') || fullText.includes('telehealth') || 
-                                    fullText.includes('remote monitoring') || fullText.includes('virtual care');
-      const hasDiabetesInPaper = fullText.includes('diabetes') || fullText.includes('diabetic') || 
-                                fullText.includes('diabetes mellitus');
-      
-      if (!hasTelemedicineInPaper || !hasDiabetesInPaper) {
-        return false;
-      }
-    }
-    
-    // Must contain ALL key terms from query
-    const hasAllTerms = queryTerms.every(term => {
-      // Direct match
-      if (fullText.includes(term)) return true;
-      
-      // Medical term synonyms
-      const synonyms: { [key: string]: string[] } = {
-        'telemedicine': ['telehealth', 'remote monitoring', 'virtual care', 'digital health'],
-        'diabetes': ['diabetic', 'diabetes mellitus', 'type 1', 'type 2'],
-        'statins': ['statin', 'atorvastatin', 'simvastatin', 'rosuvastatin', 'lipid lowering'],
-        'glp-1': ['glp1', 'glucagon-like peptide', 'semaglutide', 'liraglutide', 'dulaglutide'],
-        'biologics': ['biologic', 'biological', 'monoclonal antibody', 'mab'],
-        'ra': ['rheumatoid arthritis', 'rheumatoid'],
-        'cancer': ['oncology', 'tumor', 'malignant', 'carcinoma'],
-        'elderly': ['geriatric', 'older adults', 'aging', 'senior'],
-        'safety': ['adverse', 'toxicity', 'side effects', 'complications'],
-        'effectiveness': ['efficacy', 'outcomes', 'effectiveness', 'clinical benefit']
-      };
-      
-      // Check synonyms
-      if (synonyms[term]) {
-        return synonyms[term].some(synonym => fullText.includes(synonym));
-      }
-      
-      return false;
-    });
-    
-    return hasAllTerms;
-  });
-};
+// Relevance validation function (currently disabled - using all papers)
+// const filterRelevantPapers = (papers: Paper[], query: string): Paper[] => {
+//   // Function disabled - using all papers from PubMed as they are relevant
+//   return papers;
+// };
 
 export async function POST(req: NextRequest) {
   let papers: Paper[] = [];

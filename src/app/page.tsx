@@ -76,7 +76,7 @@ const generateProfessionalPDF = (analysis: string, query: string, papers: PubMed
     doc.setFontSize(9);
     
     // Clean the analysis text (remove markdown)
-    let cleanAnalysis = analysis
+    const cleanAnalysis = analysis
       .replace(/\*\*/g, '') // Remove bold markers
       .replace(/##\s*/g, '') // Remove header markers
       .replace(/\*\s*/g, '• '); // Convert bullets
