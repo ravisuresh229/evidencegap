@@ -26,6 +26,27 @@ const exampleQuestions = [
   "Novel biomarkers for early cancer detection"
 ];
 
+// Function to parse markdown and convert to clean HTML
+const parseMarkdown = (text: string): string => {
+  if (!text) return '';
+  
+  return text
+    // Remove markdown headers and convert to styled divs
+    .replace(/^## \*\*(.*?)\*\*/gm, '<div class="text-xl font-bold text-gray-900 mb-3 mt-4">$1</div>')
+    .replace(/^## (.*?)$/gm, '<div class="text-xl font-bold text-gray-900 mb-3 mt-4">$1</div>')
+    // Convert bold text
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>')
+    // Convert bullet points
+    .replace(/^- \*\*(.*?)\*\*: (.*?)$/gm, '<div class="mb-2"><strong class="font-semibold text-gray-800">$1:</strong> $2</div>')
+    .replace(/^- (.*?)$/gm, '<div class="mb-2 ml-4">• $1</div>')
+    // Convert numbered lists
+    .replace(/^\d+\. \*\*(.*?)\*\*: (.*?)$/gm, '<div class="mb-2"><strong class="font-semibold text-gray-800">$1:</strong> $2</div>')
+    .replace(/^\d+\. (.*?)$/gm, '<div class="mb-2 ml-4">$&</div>')
+    // Convert line breaks
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+};
+
 export default function Home() {
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,6 +57,8 @@ export default function Home() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [expandedPapers, setExpandedPapers] = useState<Set<number>>(new Set());
   const [loadingStage, setLoadingStage] = useState<string>("");
+  const [exporting, setExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -391,12 +414,85 @@ export default function Home() {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-gray-900">Evidence Intelligence Analysis</h2>
+                  {exportMessage && (
+                    <div className={`px-3 py-2 rounded-lg text-sm font-medium ${
+                      exportMessage.includes('successfully') 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-red-100 text-red-700'
+                    }`}>
+                      {exportMessage}
+                    </div>
+                  )}
                   {analysis && (
-                    <button className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                      </svg>
-                      Export PDF
+                    <button 
+                      onClick={async () => {
+                        setExporting(true);
+                        setExportMessage(null);
+                        
+                        try {
+                          // Clean the analysis text for export
+                          const cleanAnalysis = analysis.analysis
+                            .replace(/\*\*/g, '') // Remove bold markers
+                            .replace(/^## /gm, '') // Remove header markers
+                            .replace(/^- \*\*(.*?)\*\*: /gm, '- $1: ') // Clean bullet points
+                            .replace(/^\d+\. \*\*(.*?)\*\*: /gm, '$1. $1: '); // Clean numbered lists
+                          
+                          // Create PDF content
+                          const pdfContent = `
+AETHER Evidence Intelligence Analysis
+=====================================
+
+Clinical Question: ${question}
+Papers Analyzed: ${analysis.papers_analyzed}
+Generated on: ${new Date().toLocaleDateString()}
+
+${cleanAnalysis}
+
+---
+AETHER Evidence Intelligence Platform
+Accelerating evidence discovery with AI
+                          `;
+                          
+                          // Create blob and download
+                          const blob = new Blob([pdfContent], { type: 'text/plain' });
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `aether-evidence-analysis-${Date.now()}.txt`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          window.URL.revokeObjectURL(url);
+                          
+                          setExportMessage('Analysis exported successfully!');
+                          setTimeout(() => setExportMessage(null), 3000);
+                        } catch (error) {
+                          console.error('Export error:', error);
+                          setExportMessage('Export temporarily unavailable. Please try again later.');
+                          setTimeout(() => setExportMessage(null), 5000);
+                        } finally {
+                          setExporting(false);
+                        }
+                      }}
+                      disabled={exporting}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                    >
+                      {exporting ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                          </svg>
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                          </svg>
+                          Export Analysis
+                        </>
+                      )}
                     </button>
                   )}
                 </div>
@@ -475,9 +571,12 @@ export default function Home() {
                     
                     {analysis.analysis ? (
                       <div className="bg-white rounded-lg p-6 border border-green-200 max-h-96 overflow-y-auto">
-                        <div className="text-gray-800 leading-relaxed whitespace-pre-line text-sm">
-                          {analysis.analysis}
-                        </div>
+                        <div 
+                          className="text-gray-800 leading-relaxed text-sm prose prose-sm max-w-none"
+                          dangerouslySetInnerHTML={{ 
+                            __html: parseMarkdown(analysis.analysis) 
+                          }}
+                        />
                       </div>
                     ) : (
                       <div className="bg-white rounded-lg p-6 border border-green-200">
