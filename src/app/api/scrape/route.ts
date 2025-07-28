@@ -78,7 +78,7 @@ const analyzeQuery = (query: string): QueryAnalysis => {
   const intervention = interventions.find(interv => lowerQuery.includes(interv)) || null;
   
   // Split query into important terms (remove common words)
-  const stopWords = ['the', 'of', 'in', 'and', 'or', 'what', 'is', 'effectiveness', 'efficacy', 'outcomes', 'long', 'term', 'early', 'novel'];
+  const stopWords = ['the', 'of', 'in', 'and', 'or', 'what', 'is', 'effectiveness', 'efficacy', 'outcomes', 'long', 'term'];
   const words = query.toLowerCase().split(' ').filter(word => 
     word.length > 1 && !stopWords.includes(word)
   );
@@ -223,6 +223,14 @@ const buildPubMedQuery = (userQuery: string): string => {
   // Biologic therapy RA queries
   if (lowerQuery.includes('biologic') && (lowerQuery.includes('rheumatoid') || lowerQuery.includes('ra'))) {
     return `(biologic AND ("rheumatoid arthritis" OR RA) AND (sequence OR order OR line OR therapy)) AND (2019:2024[dp])`;
+  }
+  
+  // Biomarker queries
+  if (lowerQuery.includes('biomarker') || lowerQuery.includes('biomarkers')) {
+    if (lowerQuery.includes('cancer')) {
+      return `((biomarker OR biomarkers) AND (cancer OR tumor OR neoplasm) AND (detection OR screening OR diagnosis)) AND (2019:2024[dp])`;
+    }
+    return `(biomarker OR biomarkers) AND (detection OR screening OR diagnosis) AND (2019:2024[dp])`;
   }
   
   // Construct boolean query
