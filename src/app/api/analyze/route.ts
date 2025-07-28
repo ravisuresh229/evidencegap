@@ -18,6 +18,94 @@ interface TruncatedPaper {
   pubDate: string;
 }
 
+// Query-specific intelligence function
+const addQueryContext = (query: string) => {
+  const contexts: { [key: string]: { focus: string; outcomes: string; populations: string } } = {
+    'telemedicine': {
+      focus: 'remote care delivery effectiveness, patient engagement, cost implications',
+      outcomes: 'clinical outcomes vs in-person care, patient satisfaction, care accessibility',
+      populations: 'rural vs urban patients, elderly vs younger patients, different chronic conditions'
+    },
+    'diabetes': {
+      focus: 'glycemic control, medication adherence, complication prevention',
+      outcomes: 'HbA1c trends, hospitalization rates, quality of life measures',
+      populations: 'type 1 vs type 2, pediatric vs adult, different ethnic groups'
+    },
+    'jak inhibitors': {
+      focus: 'safety profiles, effectiveness vs other biologics, long-term outcomes',
+      outcomes: 'adverse events, treatment persistence, disease activity scores',
+      populations: 'elderly patients, patients with comorbidities, treatment-naive vs experienced'
+    },
+    'statins': {
+      focus: 'cardiovascular risk reduction, safety in different populations, adherence patterns',
+      outcomes: 'LDL reduction, cardiovascular events, muscle-related adverse events',
+      populations: 'elderly patients, patients with diabetes, different cardiovascular risk levels'
+    },
+    'glp-1': {
+      focus: 'weight loss effects, cardiovascular benefits, glycemic control',
+      outcomes: 'HbA1c reduction, weight loss, cardiovascular outcomes, gastrointestinal side effects',
+      populations: 'obese patients, cardiovascular risk patients, different age groups'
+    },
+    'biologics': {
+      focus: 'effectiveness vs conventional therapy, safety profiles, cost-effectiveness',
+      outcomes: 'disease activity scores, adverse events, treatment persistence, quality of life',
+      populations: 'treatment-naive vs experienced, different disease severities, elderly patients'
+    },
+    'cancer': {
+      focus: 'survival outcomes, treatment response, quality of life during treatment',
+      outcomes: 'overall survival, progression-free survival, adverse events, patient-reported outcomes',
+      populations: 'different cancer stages, age groups, treatment histories'
+    },
+    'elderly': {
+      focus: 'safety profiles, effectiveness in older populations, polypharmacy interactions',
+      outcomes: 'adverse events, functional outcomes, quality of life, healthcare utilization',
+      populations: 'different age subgroups, patients with multiple comorbidities, nursing home residents'
+    }
+  };
+  
+  // Extract relevant context based on query terms
+  const queryLower = query.toLowerCase();
+  return Object.keys(contexts).find(key => queryLower.includes(key));
+};
+
+// Relevance validation function
+const filterRelevantPapers = (papers: Paper[], query: string): Paper[] => {
+  const queryTerms = query.toLowerCase().split(' ').filter(term => term.length > 2);
+  
+  return papers.filter(paper => {
+    const fullText = `${paper.title} ${paper.abstract}`.toLowerCase();
+    
+    // Must contain ALL key terms from query
+    const hasAllTerms = queryTerms.every(term => {
+      // Direct match
+      if (fullText.includes(term)) return true;
+      
+      // Medical term synonyms
+      const synonyms: { [key: string]: string[] } = {
+        'telemedicine': ['telehealth', 'remote monitoring', 'virtual care', 'digital health'],
+        'diabetes': ['diabetic', 'diabetes mellitus', 'type 1', 'type 2'],
+        'statins': ['statin', 'atorvastatin', 'simvastatin', 'rosuvastatin', 'lipid lowering'],
+        'glp-1': ['glp1', 'glucagon-like peptide', 'semaglutide', 'liraglutide', 'dulaglutide'],
+        'biologics': ['biologic', 'biological', 'monoclonal antibody', 'mab'],
+        'ra': ['rheumatoid arthritis', 'rheumatoid'],
+        'cancer': ['oncology', 'tumor', 'malignant', 'carcinoma'],
+        'elderly': ['geriatric', 'older adults', 'aging', 'senior'],
+        'safety': ['adverse', 'toxicity', 'side effects', 'complications'],
+        'effectiveness': ['efficacy', 'outcomes', 'effectiveness', 'clinical benefit']
+      };
+      
+      // Check synonyms
+      if (synonyms[term]) {
+        return synonyms[term].some(synonym => fullText.includes(synonym));
+      }
+      
+      return false;
+    });
+    
+    return hasAllTerms;
+  });
+};
+
 export async function POST(req: NextRequest) {
   let papers: Paper[] = [];
   let query: string = '';
@@ -39,59 +127,142 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Truncate papers to avoid token limits
-    const truncatedPapers: TruncatedPaper[] = papers.slice(0, 10).map((paper: Paper) => ({
+    // Filter papers for relevance before analysis
+    const relevantPapers = filterRelevantPapers(papers, query);
+    
+    // Get query-specific context
+    const queryContext = addQueryContext(query);
+    
+    // Define contexts for use in prompt
+    const contexts: { [key: string]: { focus: string; outcomes: string; populations: string } } = {
+      'telemedicine': {
+        focus: 'remote care delivery effectiveness, patient engagement, cost implications',
+        outcomes: 'clinical outcomes vs in-person care, patient satisfaction, care accessibility',
+        populations: 'rural vs urban patients, elderly vs younger patients, different chronic conditions'
+      },
+      'diabetes': {
+        focus: 'glycemic control, medication adherence, complication prevention',
+        outcomes: 'HbA1c trends, hospitalization rates, quality of life measures',
+        populations: 'type 1 vs type 2, pediatric vs adult, different ethnic groups'
+      },
+      'jak inhibitors': {
+        focus: 'safety profiles, effectiveness vs other biologics, long-term outcomes',
+        outcomes: 'adverse events, treatment persistence, disease activity scores',
+        populations: 'elderly patients, patients with comorbidities, treatment-naive vs experienced'
+      },
+      'statins': {
+        focus: 'cardiovascular risk reduction, safety in different populations, adherence patterns',
+        outcomes: 'LDL reduction, cardiovascular events, muscle-related adverse events',
+        populations: 'elderly patients, patients with diabetes, different cardiovascular risk levels'
+      },
+      'glp-1': {
+        focus: 'weight loss effects, cardiovascular benefits, glycemic control',
+        outcomes: 'HbA1c reduction, weight loss, cardiovascular outcomes, gastrointestinal side effects',
+        populations: 'obese patients, cardiovascular risk patients, different age groups'
+      },
+      'biologics': {
+        focus: 'effectiveness vs conventional therapy, safety profiles, cost-effectiveness',
+        outcomes: 'disease activity scores, adverse events, treatment persistence, quality of life',
+        populations: 'treatment-naive vs experienced, different disease severities, elderly patients'
+      },
+      'cancer': {
+        focus: 'survival outcomes, treatment response, quality of life during treatment',
+        outcomes: 'overall survival, progression-free survival, adverse events, patient-reported outcomes',
+        populations: 'different cancer stages, age groups, treatment histories'
+      },
+      'elderly': {
+        focus: 'safety profiles, effectiveness in older populations, polypharmacy interactions',
+        outcomes: 'adverse events, functional outcomes, quality of life, healthcare utilization',
+        populations: 'different age subgroups, patients with multiple comorbidities, nursing home residents'
+      }
+    };
+    
+    if (relevantPapers.length === 0) {
+      return NextResponse.json({
+        analysis: `## **RELEVANCE FILTERING RESULTS**
+
+**Query**: "${query}"
+
+**Papers Found**: ${papers.length} total papers
+**Relevant Papers**: 0 papers passed relevance validation
+
+**Relevance Criteria Applied:**
+- Papers must contain ALL key terms from your query
+- Medical term synonyms were considered (e.g., "diabetes" includes "diabetic", "telemedicine" includes "telehealth")
+- Minimum term length of 3 characters
+
+**Recommendations:**
+1. **Broaden your search terms** - Try using more general terms
+2. **Use alternative terminology** - Consider synonyms for medical conditions
+3. **Check spelling** - Ensure medical terms are correctly spelled
+4. **Try example questions** - Use the provided example questions as templates
+
+**Example Refinements:**
+- Instead of "GLP-1 agonists", try "diabetes medication"
+- Instead of "biologics in RA", try "rheumatoid arthritis treatment"
+- Instead of "telemedicine outcomes", try "remote care diabetes"`
+
+      });
+    }
+
+    // Truncate relevant papers to avoid token limits
+    const truncatedPapers: TruncatedPaper[] = relevantPapers.slice(0, 10).map((paper: Paper) => ({
       title: paper.title || 'No title',
       abstract: paper.abstract ? paper.abstract.substring(0, 500) : 'No abstract available',
       journal: paper.journal || 'Unknown journal',
       pubDate: paper.pubDate || 'Unknown date'
     }));
 
-    const prompt = `You are a senior healthcare strategy consultant analyzing medical literature for pharmaceutical and biotech companies.
+    const prompt = `You are a real-world evidence strategist at Atropos Health, analyzing medical literature to identify evidence gaps that can be addressed using federated clinical data networks.
 
 CLINICAL QUESTION: "${query}"
 
-RESEARCH PAPERS TO ANALYZE:
-${truncatedPapers.map((paper: TruncatedPaper, index: number) => `
+${queryContext ? `QUERY-SPECIFIC CONTEXT:
+- Focus Areas: ${contexts[queryContext].focus}
+- Key Outcomes: ${contexts[queryContext].outcomes}
+- Target Populations: ${contexts[queryContext].populations}
+
+` : ''}RESEARCH PAPERS: ${truncatedPapers.map((paper: TruncatedPaper, index: number) => `
 Paper ${index + 1}:
 Title: ${paper.title}
 Journal: ${paper.journal} (${paper.pubDate})
 Abstract: ${paper.abstract}
 `).join('\n')}
 
-Provide a comprehensive analysis in this format:
+Provide analysis in this EXACT format:
 
-## **EXECUTIVE SUMMARY**
-[2-3 sentences on current research landscape and key opportunities]
+## **CURRENT REAL-WORLD EVIDENCE LANDSCAPE**
+[2-3 sentences on what RWE currently exists and what's missing from clinical practice]
 
-## **REAL-WORLD EVIDENCE OPPORTUNITIES**
-- **Gap 1**: [Specific evidence gap]
-  - RWE Study Design: [Retrospective cohort/case-control/registry study]
-  - Data Requirements: [Specific EHR elements, claims codes needed]
-  - Clinical Impact: [How this affects patient care decisions]
-  - Timeline: [2-5 year estimate]
+## **PRIORITY EVIDENCE GAPS FOR FEDERATED DATA NETWORKS**
 
-- **Gap 2**: [Another evidence gap]
-  - RWE Study Design: [Study type]
-  - Data Requirements: [Data needed]
-  - Clinical Impact: [Patient care impact]
-  - Timeline: [Timeline estimate]
+**Gap 1: [Specific, actionable gap]**
+- **Why This Matters**: [Specific clinical decision this would inform]
+- **RWE Study Design**: [Retrospective cohort/case-control/registry - be specific]
+- **Required Data Elements**: [Specific EHR fields, ICD codes, lab values needed]
+- **Multi-Site Value**: [Why federated data from multiple hospitals improves this research]
+- **Clinical Decision Impact**: [Exactly how this changes patient care]
+- **Evidence Timeline**: [Realistic timeline: 12-24 months for RWE vs 5+ years for RCT]
 
-## **FEDERATED DATA NETWORK VALUE**
-[How multi-institutional data could address these gaps]
+**Gap 2: [Another specific gap]**
+[Same structure as above]
 
-## **EVIDENCE GENERATION PRODUCT OPPORTUNITIES**
-- **Data Integration Challenge**: What federated data sources would be needed?
-- **User Workflow**: How would clinicians/researchers interact with this evidence?
-- **Technical Requirements**: What AI/ML capabilities could accelerate this research?
-- **Scalability**: How could this research template apply to similar conditions?
+## **ATROPOS EVIDENCE GENERATION OPPORTUNITIES**
+- **Point-of-Care Questions**: What specific questions would clinicians ask that this evidence answers?
+- **Population Insights**: Which patient subgroups need better evidence representation?
+- **Outcome Measurement**: What real-world outcomes should be tracked beyond clinical trials?
+- **Implementation Gaps**: Where does clinical practice diverge from published evidence?
 
-## **STRATEGIC RECOMMENDATIONS**
-1. **Immediate (0-2 years)**: [Quick wins with existing data]
-2. **Medium-term (2-5 years)**: [Larger studies needed]
-3. **Partnership opportunities**: [Academic/industry collaborations]
+## **STRATEGIC NEXT STEPS**
+1. **Immediate RWE Studies** (6-18 months): [Specific studies using existing data]
+2. **Enhanced Data Collection** (1-2 years): [What new data elements should be captured]  
+3. **Clinical Integration** (2-3 years): [How to embed this evidence into clinical workflows]
 
-Focus on actionable research opportunities using real-world clinical data.`;
+FOCUS ON: Evidence gaps that can only be filled by large-scale, multi-institutional real-world data - not more clinical trials.
+
+AVOID: Generic statements like "more research needed" or "long-term studies required"
+
+BE SPECIFIC: Every gap should be actionable with clear data requirements and clinical impact.`;
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -102,7 +273,7 @@ Focus on actionable research opportunities using real-world clinical data.`;
       messages: [
         {
           role: "system",
-          content: "You are a healthcare research strategist providing actionable intelligence for evidence generation."
+          content: "You are a real-world evidence strategist at Atropos Health, focused on identifying actionable evidence gaps that can be addressed through federated clinical data networks. You provide specific, actionable insights for evidence generation using real-world data."
         },
         {
           role: "user",
@@ -124,7 +295,7 @@ Focus on actionable research opportunities using real-world clinical data.`;
     return NextResponse.json({
       analysis: `## **ANALYSIS TEMPORARILY UNAVAILABLE**
 
-Found ${papers?.length || 0} relevant research papers for "${query || 'your search'}".
+Found ${papers?.length || 0} research papers for "${query || 'your search'}" (relevance filtering applied).
 
 **Key Research Areas Identified:**
 - Comparative effectiveness studies needed
@@ -133,7 +304,7 @@ Found ${papers?.length || 0} relevant research papers for "${query || 'your sear
 - Patient population diversity in studies
 
 **Recommended Next Steps:**
-1. Review the ${papers?.length || 0} papers found for detailed insights
+1. Review the papers found for detailed insights
 2. Identify specific patient populations of interest
 3. Consider multi-institutional data collaboration
 4. Plan observational studies using EHR/claims data
